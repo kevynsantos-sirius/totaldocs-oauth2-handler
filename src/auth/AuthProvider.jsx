@@ -37,7 +37,8 @@ export default function AuthProvider({ children }) {
       grant_type: "authorization_code",
       code,
       redirect_uri: REDIRECT_URI,
-      client_id: CLIENT_ID
+      client_id: CLIENT_ID,
+      code_verifier: localStorage.getItem("pkce_verifier")
     });
 
     const response = await apiClient.post(TOKEN_URL, body);
