@@ -1,5 +1,6 @@
 // src/auth/AuthProvider.jsx
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom"; // precisa do react-router-dom
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
@@ -25,6 +26,13 @@ export default function AuthProvider({ children }) {
   const [iframeSrc, setIframeSrc] = useState("");
   const [manualLogout, setManualLogout] = useState(false);
 
+  // 👇 novos estados
+  const [lastPath, setLastPath] = useState(null);
+  const [shouldRedirectAfterLogin, setShouldRedirectAfterLogin] = useState(false);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const authRef = useRef(auth);
   useEffect(() => {
     authRef.current = auth;
@@ -35,32 +43,43 @@ export default function AuthProvider({ children }) {
     else localStorage.removeItem("auth");
   }, [auth]);
 
-  const handleCallback = useCallback(async (code) => {
-    const codeVerifier = localStorage.getItem("pkce_verifier") || "";
-    const body = new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: REDIRECT_URI,
-      client_id: CLIENT_ID,
-      code_verifier: codeVerifier,
-    });
-
-    try {
-      const response = await apiClient.post(TOKEN_URL, body);
-      setAuth({
-        accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-        expiresIn: response.data.expires_in,
-        createdAt: Date.now(),
+  const handleCallback = useCallback(
+    async (code) => {
+      const codeVerifier = localStorage.getItem("pkce_verifier") || "";
+      const body = new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: REDIRECT_URI,
+        client_id: CLIENT_ID,
+        code_verifier: codeVerifier,
       });
-      setShowIframe(false);
-      setManualLogout(false);
-      console.log("✅ Login efetuado com sucesso (monitorando, sem redirect)");
-    } catch (err) {
-      console.error("❌ Falha no login:", err.response?.data || err.message);
-      setShowIframe(true);
-    }
-  }, []);
+
+      try {
+        const response = await apiClient.post(TOKEN_URL, body);
+        setAuth({
+          accessToken: response.data.access_token,
+          refreshToken: response.data.refresh_token,
+          expiresIn: response.data.expires_in,
+          createdAt: Date.now(),
+        });
+        setShowIframe(false);
+        setManualLogout(false);
+        console.log("✅ Login efetuado com sucesso (monitorando, sem redirect)");
+
+        // 👇 só redireciona se a flag tiver sido ligada
+        if (shouldRedirectAfterLogin && lastPath) {
+          console.log("🔀 Redirecionando de volta para:", lastPath);
+          navigate(lastPath, { replace: true });
+          setShouldRedirectAfterLogin(false);
+          setLastPath(null);
+        }
+      } catch (err) {
+        console.error("❌ Falha no login:", err.response?.data || err.message);
+        setShowIframe(true);
+      }
+    },
+    [lastPath, shouldRedirectAfterLogin, navigate]
+  );
 
   const login = useCallback(async () => {
     const { codeVerifier, codeChallenge } = await generatePKCE();
@@ -83,11 +102,19 @@ export default function AuthProvider({ children }) {
   }, [handleCallback]);
 
   const logout = useCallback(() => {
+    // 🔑 Remove todas as chaves que o AuthProvider usa
+    localStorage.removeItem("auth");
+    localStorage.removeItem("pkce_verifier");
+
+    // 🚮 Caso queira realmente limpar tudo do storage:
+    // localStorage.clear();
+
     setAuth(null);
     setShowIframe(false);
     setManualLogout(true);
-    console.log("🚪 Logout efetuado");
+    console.log("🚪 Logout efetuado (storage limpo)");
   }, []);
+
 
   // Intervalo para monitorar token
   useEffect(() => {
@@ -96,7 +123,6 @@ export default function AuthProvider({ children }) {
       console.log("⏱️ Intervalo executado:", new Date().toLocaleTimeString());
 
       if (!currentAuth?.expiresIn) {
-        // Sem sessão ativa, mostra iframe de login
         setShowIframe(true);
         return;
       }
@@ -106,7 +132,7 @@ export default function AuthProvider({ children }) {
 
       if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) {
         console.log("⚠️ Token expirando, forçando login novamente...");
-        login(); // força login PKCE via iframe
+        login();
       }
     }, 30000);
 
@@ -118,12 +144,22 @@ export default function AuthProvider({ children }) {
     if (!auth && !manualLogout) login();
   }, [auth, manualLogout, login]);
 
-  const checkLogin = useCallback(() => {
-    login(); // sempre dispara login, independente do auth atual
-  }, [login]);
+  // 👇 checkLogin aceita flag
+  const checkLogin = useCallback(
+    (redirectBack = false) => {
+      if (redirectBack) {
+        setLastPath(location.pathname); // salva rota atual
+        setShouldRedirectAfterLogin(true);
+      }
+      login();
+    },
+    [location.pathname, login]
+  );
 
   return (
-    <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin }}>
+    <AuthContext.Provider
+      value={{ auth, login, logout, handleCallback, checkLogin }}
+    >
       {children}
       {showIframe && (
         <iframe

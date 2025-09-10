@@ -5,14 +5,13 @@ import Callback from "./pages/Callback";
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Routes>
           <Route path="/callback" element={<Callback />} />
           <Route path="*" element={null} /> {/* nada visível na rota principal */}
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
-
