@@ -49,13 +49,13 @@ export default function AuthProvider({ children }) {
       const response = await apiClient.post(TOKEN_URL, body);
       setAuth({
         accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token, // se existir
+        refreshToken: response.data.refresh_token,
         expiresIn: response.data.expires_in,
         createdAt: Date.now(),
       });
       setShowIframe(false);
       setManualLogout(false);
-      console.log("✅ Login efetuado com sucesso");
+      console.log("✅ Login efetuado com sucesso (monitorando, sem redirect)");
     } catch (err) {
       console.error("❌ Falha no login:", err.response?.data || err.message);
       setShowIframe(true);
@@ -89,28 +89,31 @@ export default function AuthProvider({ children }) {
     console.log("🚪 Logout efetuado");
   }, []);
 
-  // Intervalo para checar token a cada 30s
+  // Intervalo para monitorar token
   useEffect(() => {
     const interval = setInterval(() => {
       const currentAuth = authRef.current;
       console.log("⏱️ Intervalo executado:", new Date().toLocaleTimeString());
 
-      if (!currentAuth?.expiresIn) return;
+      if (!currentAuth?.expiresIn) {
+        // Sem sessão ativa, mostra iframe de login
+        setShowIframe(true);
+        return;
+      }
 
       const ageInSeconds = Math.floor((Date.now() - currentAuth.createdAt) / 1000);
       console.log(`🔍 Checando token: idade ${ageInSeconds}s (expira em ${currentAuth.expiresIn}s)`);
 
-      // Se faltar <=60s para expirar, força login novamente
       if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) {
         console.log("⚠️ Token expirando, forçando login novamente...");
-        login();
+        login(); // força login PKCE via iframe
       }
     }, 30000);
 
     return () => clearInterval(interval);
   }, [login]);
 
-  // Login automático
+  // Login automático só se não houver sessão
   useEffect(() => {
     if (!auth && !manualLogout) login();
   }, [auth, manualLogout, login]);
