@@ -1,7 +1,7 @@
 // SessionGuard.jsx
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "./useAuth";
+import useAuth from "./useAuth";
 
 const SessionGuard = ({ children }) => {
   const location = useLocation();
