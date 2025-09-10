@@ -118,8 +118,12 @@ export default function AuthProvider({ children }) {
     if (!auth && !manualLogout) login();
   }, [auth, manualLogout, login]);
 
+  const checkLogin = useCallback(() => {
+    login(); // sempre dispara login, independente do auth atual
+  }, [login]);
+
   return (
-    <AuthContext.Provider value={{ auth, login, logout, handleCallback }}>
+    <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin }}>
       {children}
       {showIframe && (
         <iframe
