@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import useAuth from "./useAuth";
+import useAuth from "./useAuth.js";
 
 interface SessionGuardProps {
   children: ReactNode;

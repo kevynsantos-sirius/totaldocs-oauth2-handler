@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import useAuth from '../auth/useAuth';
+import useAuth from '../auth/useAuth.js';
 
 export default function Callback() {
   const { handleCallback } = useAuth();

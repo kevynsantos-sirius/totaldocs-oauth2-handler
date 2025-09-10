@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import AuthContext from "./AuthContext";
-import apiClient from "../api/apiClient";
-import { generatePKCE } from "../utils/pkce";
+import AuthContext from "./AuthContext.js";
+import apiClient from "../api/apiClient.js";
+import { generatePKCE } from "../utils/pkce.js";
 
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;

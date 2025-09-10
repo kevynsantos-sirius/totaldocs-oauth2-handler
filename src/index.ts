@@ -1,4 +1,4 @@
 // src/index.js
-export { default as AuthProvider } from './auth/AuthProvider';
-export { default as SessionGuard } from './auth/SessionGuard';
-export { default as useAuth } from './auth/useAuth';
+export * from './auth/AuthProvider.js';
+export * from './auth/SessionGuard.js';
+export * from './auth/useAuth.js';
