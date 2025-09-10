@@ -1,18 +1,29 @@
-// src/auth/AuthProvider.jsx
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom"; // precisa do react-router-dom
+import type { ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
 
-const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL;
-const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL;
-const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID;
-const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI;
-const REFRESH_TIME = import.meta.env.VITE_OAUTH2_REFRESH_TIME;
+const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
+const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
+const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
+const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
+const REFRESH_TIME = Number(import.meta.env.VITE_OAUTH2_REFRESH_TIME);
 
-export default function AuthProvider({ children }) {
-  const [auth, setAuth] = useState(() => {
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+interface AuthData {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  createdAt: number;
+}
+
+export default function AuthProvider({ children }: AuthProviderProps) {
+  const [auth, setAuth] = useState<AuthData | null>(() => {
     const stored = localStorage.getItem("auth");
     if (stored) {
       const parsed = JSON.parse(stored);
@@ -26,8 +37,7 @@ export default function AuthProvider({ children }) {
   const [iframeSrc, setIframeSrc] = useState("");
   const [manualLogout, setManualLogout] = useState(false);
 
-  // 👇 novos estados
-  const [lastPath, setLastPath] = useState(null);
+  const [lastPath, setLastPath] = useState<string | null>(null);
   const [shouldRedirectAfterLogin, setShouldRedirectAfterLogin] = useState(false);
 
   const location = useLocation();
@@ -44,7 +54,7 @@ export default function AuthProvider({ children }) {
   }, [auth]);
 
   const handleCallback = useCallback(
-    async (code) => {
+    async (code: string) => {
       const codeVerifier = localStorage.getItem("pkce_verifier") || "";
       const body = new URLSearchParams({
         grant_type: "authorization_code",
@@ -66,14 +76,13 @@ export default function AuthProvider({ children }) {
         setManualLogout(false);
         console.log("✅ Login efetuado com sucesso (monitorando, sem redirect)");
 
-        // 👇 só redireciona se a flag tiver sido ligada
         if (shouldRedirectAfterLogin && lastPath) {
           console.log("🔀 Redirecionando de volta para:", lastPath);
           navigate(lastPath, { replace: true });
           setShouldRedirectAfterLogin(false);
           setLastPath(null);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("❌ Falha no login:", err.response?.data || err.message);
         setShowIframe(true);
       }
@@ -92,9 +101,9 @@ export default function AuthProvider({ children }) {
     setIframeSrc(url);
     setShowIframe(true);
 
-    const messageListener = (event) => {
+    const messageListener = (event: MessageEvent) => {
       if (event.origin !== window.origin) return;
-      const { code } = event.data;
+      const { code } = event.data as { code?: string };
       if (code) handleCallback(code);
     };
 
@@ -102,19 +111,14 @@ export default function AuthProvider({ children }) {
   }, [handleCallback]);
 
   const logout = useCallback(() => {
-    // 🔑 Remove todas as chaves que o AuthProvider usa
     localStorage.removeItem("auth");
     localStorage.removeItem("pkce_verifier");
-
-    // 🚮 Caso queira realmente limpar tudo do storage:
-    // localStorage.clear();
 
     setAuth(null);
     setShowIframe(false);
     setManualLogout(true);
     console.log("🚪 Logout efetuado (storage limpo)");
   }, []);
-
 
   // Intervalo para monitorar token
   useEffect(() => {
@@ -139,16 +143,14 @@ export default function AuthProvider({ children }) {
     return () => clearInterval(interval);
   }, [login]);
 
-  // Login automático só se não houver sessão
   useEffect(() => {
     if (!auth && !manualLogout) login();
   }, [auth, manualLogout, login]);
 
-  // 👇 checkLogin aceita flag
   const checkLogin = useCallback(
-    (redirectBack = false) => {
+    (redirectBack: boolean = false) => {
       if (redirectBack) {
-        setLastPath(location.pathname); // salva rota atual
+        setLastPath(location.pathname);
         setShouldRedirectAfterLogin(true);
       }
       login();
