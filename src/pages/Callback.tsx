@@ -1,7 +1,7 @@
+// src/pages/Callback.tsx
 import { useEffect } from "react";
-import type { Location } from "react-router-dom";
-import type { NavigateFunction } from "react-router-dom";
-import useAuth from '../auth/useAuth';
+import type { Location, NavigateFunction } from "react-router-dom";
+import useAuth from "../auth/useAuth";
 
 interface CallbackProps {
   location: Location;
@@ -25,5 +25,5 @@ export default function Callback({ location, navigate }: CallbackProps) {
     }
   }, [location.search, handleCallback, navigate]);
 
-  return <></>;
+  return null; // Não renderiza nada
 }

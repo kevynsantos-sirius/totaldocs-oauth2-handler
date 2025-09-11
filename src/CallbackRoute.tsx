@@ -1,3 +1,4 @@
+// src/CallbackRoute.tsx
 import { Route } from "react-router-dom";
 import Callback from "./pages/Callback";
 import type { Location, NavigateFunction } from "react-router-dom";

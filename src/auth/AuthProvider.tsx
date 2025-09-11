@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import type { ReactNode } from "react";
-import { NavigateFunction, Location } from "react-router-dom";
+// src/auth/AuthProvider.tsx
+import { useState, useEffect, useCallback, useRef, ReactNode } from "react";
+import type { Location, NavigateFunction } from "react-router-dom";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
@@ -11,17 +11,17 @@ const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
 const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
 const REFRESH_TIME = Number(import.meta.env.VITE_OAUTH2_REFRESH_TIME);
 
-interface AuthProviderProps {
-  children: ReactNode;
-  location: Location;
-  navigate: NavigateFunction;
-}
-
 interface AuthData {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
   createdAt: number;
+}
+
+interface AuthProviderProps {
+  children: ReactNode;
+  location?: Location;
+  navigate?: NavigateFunction;
 }
 
 export default function AuthProvider({ children, location, navigate }: AuthProviderProps) {
@@ -40,6 +40,9 @@ export default function AuthProvider({ children, location, navigate }: AuthProvi
   const [manualLogout, setManualLogout] = useState(false);
   const [lastPath, setLastPath] = useState<string | null>(null);
   const [shouldRedirectAfterLogin, setShouldRedirectAfterLogin] = useState(false);
+
+  const currentLocation = location ?? { pathname: "/" };
+  const currentNavigate = navigate ?? (() => {});
 
   const authRef = useRef(auth);
   useEffect(() => { authRef.current = auth; }, [auth]);
@@ -72,7 +75,7 @@ export default function AuthProvider({ children, location, navigate }: AuthProvi
         setManualLogout(false);
 
         if (shouldRedirectAfterLogin && lastPath) {
-          navigate(lastPath, { replace: true });
+          currentNavigate(lastPath, { replace: true });
           setShouldRedirectAfterLogin(false);
           setLastPath(null);
         }
@@ -81,7 +84,7 @@ export default function AuthProvider({ children, location, navigate }: AuthProvi
         setShowIframe(true);
       }
     },
-    [lastPath, shouldRedirectAfterLogin, navigate]
+    [lastPath, shouldRedirectAfterLogin, currentNavigate]
   );
 
   const login = useCallback(async () => {
@@ -132,12 +135,12 @@ export default function AuthProvider({ children, location, navigate }: AuthProvi
   const checkLogin = useCallback(
     (redirectBack: boolean = false) => {
       if (redirectBack) {
-        setLastPath(location.pathname);
+        setLastPath(currentLocation.pathname);
         setShouldRedirectAfterLogin(true);
       }
       login();
     },
-    [location.pathname, login]
+    [currentLocation.pathname, login]
   );
 
   return (
