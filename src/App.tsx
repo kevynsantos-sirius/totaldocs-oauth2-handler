@@ -1,7 +1,7 @@
 // src/App.jsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import AuthProvider from "./auth/AuthProvider.js";
-import Callback from "./pages/Callback.js";
+import AuthProvider from "./auth/AuthProvider";
+import Callback from "./pages/Callback";
 
 export default function App() {
   return (
