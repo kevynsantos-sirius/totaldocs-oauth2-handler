@@ -1,20 +1,23 @@
 import { useEffect } from "react";
-import type { ReactNode } from "react";
 import useAuth from "./useAuth";
-import type { Location } from "react-router-dom";
+import { Fragment } from "react";
+
 
 interface SessionGuardProps {
-  children: ReactNode;
-  location: Location;
+  children: React.ReactNode;
+  location: any; // Location do react-router-dom
+  navigate: any; // Navigate function do react-router-dom
 }
 
-export default function SessionGuard({ children, location }: SessionGuardProps) {
+export default function SessionGuard({ children, location, navigate }: SessionGuardProps) {
   const { checkLogin } = useAuth();
 
+  // Aqui usamos os props location/navigate, não hooks
   useEffect(() => {
     console.log("Rota acessada:", location.pathname);
-    checkLogin(true); // força checagem de login sempre que a rota mudar
+    checkLogin(true);
   }, [location.pathname, checkLogin]);
 
-  return <>{children}</>;
+  return <Fragment>{children}</Fragment>;
 }
+
