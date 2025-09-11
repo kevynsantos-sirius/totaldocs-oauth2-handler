@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { NavigateFunction, Location } from "react-router-dom";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
@@ -13,6 +13,8 @@ const REFRESH_TIME = Number(import.meta.env.VITE_OAUTH2_REFRESH_TIME);
 
 interface AuthProviderProps {
   children: ReactNode;
+  location: Location;
+  navigate: NavigateFunction;
 }
 
 interface AuthData {
@@ -22,7 +24,7 @@ interface AuthData {
   createdAt: number;
 }
 
-export default function AuthProvider({ children }: AuthProviderProps) {
+export default function AuthProvider({ children, location, navigate }: AuthProviderProps) {
   const [auth, setAuth] = useState<AuthData | null>(() => {
     const stored = localStorage.getItem("auth");
     if (stored) {
@@ -36,17 +38,11 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   const [showIframe, setShowIframe] = useState(false);
   const [iframeSrc, setIframeSrc] = useState("");
   const [manualLogout, setManualLogout] = useState(false);
-
   const [lastPath, setLastPath] = useState<string | null>(null);
   const [shouldRedirectAfterLogin, setShouldRedirectAfterLogin] = useState(false);
 
-  const location = useLocation();
-  const navigate = useNavigate();
-
   const authRef = useRef(auth);
-  useEffect(() => {
-    authRef.current = auth;
-  }, [auth]);
+  useEffect(() => { authRef.current = auth; }, [auth]);
 
   useEffect(() => {
     if (auth) localStorage.setItem("auth", JSON.stringify(auth));
@@ -74,16 +70,14 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         });
         setShowIframe(false);
         setManualLogout(false);
-        console.log("✅ Login efetuado com sucesso (monitorando, sem redirect)");
 
         if (shouldRedirectAfterLogin && lastPath) {
-          console.log("🔀 Redirecionando de volta para:", lastPath);
           navigate(lastPath, { replace: true });
           setShouldRedirectAfterLogin(false);
           setLastPath(null);
         }
       } catch (err: any) {
-        console.error("❌ Falha no login:", err.response?.data || err.message);
+        console.error("Falha no login:", err.response?.data || err.message);
         setShowIframe(true);
       }
     },
@@ -113,33 +107,21 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(() => {
     localStorage.removeItem("auth");
     localStorage.removeItem("pkce_verifier");
-
     setAuth(null);
     setShowIframe(false);
     setManualLogout(true);
-    console.log("🚪 Logout efetuado (storage limpo)");
   }, []);
 
-  // Intervalo para monitorar token
   useEffect(() => {
     const interval = setInterval(() => {
       const currentAuth = authRef.current;
-      console.log("⏱️ Intervalo executado:", new Date().toLocaleTimeString());
-
       if (!currentAuth?.expiresIn) {
         setShowIframe(true);
         return;
       }
-
       const ageInSeconds = Math.floor((Date.now() - currentAuth.createdAt) / 1000);
-      console.log(`🔍 Checando token: idade ${ageInSeconds}s (expira em ${currentAuth.expiresIn}s)`);
-
-      if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) {
-        console.log("⚠️ Token expirando, forçando login novamente...");
-        login();
-      }
+      if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) login();
     }, 30000);
-
     return () => clearInterval(interval);
   }, [login]);
 

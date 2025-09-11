@@ -1,20 +1,22 @@
 import { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import type { Location } from "react-router-dom";
+import type { NavigateFunction } from "react-router-dom";
 import useAuth from '../auth/useAuth';
 
-export default function Callback() {
+interface CallbackProps {
+  location: Location;
+  navigate: NavigateFunction;
+}
+
+export default function Callback({ location, navigate }: CallbackProps) {
   const { handleCallback } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
-    // Extrai o código da query string
     const params = new URLSearchParams(location.search);
     const code = params.get("code");
 
     if (code) {
       handleCallback(code).then(() => {
-        // Redireciona para a rota principal após login
         navigate("/", { replace: true });
       });
     } else {

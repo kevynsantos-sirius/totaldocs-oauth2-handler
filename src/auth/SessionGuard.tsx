@@ -1,14 +1,14 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { useLocation } from "react-router-dom";
 import useAuth from "./useAuth";
+import type { Location } from "react-router-dom";
 
 interface SessionGuardProps {
   children: ReactNode;
+  location: Location;
 }
 
-export default function SessionGuard({ children }: SessionGuardProps) {
-  const location = useLocation();
+export default function SessionGuard({ children, location }: SessionGuardProps) {
   const { checkLogin } = useAuth();
 
   useEffect(() => {
