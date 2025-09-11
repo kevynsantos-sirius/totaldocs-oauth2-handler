@@ -1,29 +1,21 @@
-// src/pages/Callback.tsx
 import { useEffect } from "react";
-import type { Location, NavigateFunction } from "react-router-dom";
 import useAuth from "../auth/useAuth";
 
-interface CallbackProps {
-  location: Location;
-  navigate: NavigateFunction;
-}
-
-export default function Callback({ location, navigate }: CallbackProps) {
+export default function Callback() {
   const { handleCallback } = useAuth();
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
+    // Extrai o código da query string manualmente
+    const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
 
     if (code) {
-      handleCallback(code).then(() => {
-        navigate("/", { replace: true });
-      });
+      handleCallback(code); // usa window.location.replace() dentro do handleCallback
     } else {
-      console.error("❌ Callback sem código OAuth2!");
-      navigate("/", { replace: true });
+      console.error("Callback sem código OAuth2!");
+      window.location.replace("/"); // fallback
     }
-  }, [location.search, handleCallback, navigate]);
+  }, [handleCallback]);
 
-  return null; // Não renderiza nada
+  return null;
 }

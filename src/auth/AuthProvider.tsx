@@ -1,6 +1,4 @@
-// src/auth/AuthProvider.tsx
 import { useState, useEffect, useCallback, useRef, ReactNode } from "react";
-import type { Location, NavigateFunction } from "react-router-dom";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
@@ -11,6 +9,10 @@ const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
 const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
 const REFRESH_TIME = Number(import.meta.env.VITE_OAUTH2_REFRESH_TIME);
 
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
 interface AuthData {
   accessToken: string;
   refreshToken: string;
@@ -18,13 +20,7 @@ interface AuthData {
   createdAt: number;
 }
 
-interface AuthProviderProps {
-  children: ReactNode;
-  location?: Location;
-  navigate?: NavigateFunction;
-}
-
-export default function AuthProvider({ children, location, navigate }: AuthProviderProps) {
+export default function AuthProvider({ children }: AuthProviderProps) {
   const [auth, setAuth] = useState<AuthData | null>(() => {
     const stored = localStorage.getItem("auth");
     if (stored) {
@@ -38,11 +34,6 @@ export default function AuthProvider({ children, location, navigate }: AuthProvi
   const [showIframe, setShowIframe] = useState(false);
   const [iframeSrc, setIframeSrc] = useState("");
   const [manualLogout, setManualLogout] = useState(false);
-  const [lastPath, setLastPath] = useState<string | null>(null);
-  const [shouldRedirectAfterLogin, setShouldRedirectAfterLogin] = useState(false);
-
-  const currentLocation = location ?? { pathname: "/" };
-  const currentNavigate = navigate ?? (() => {});
 
   const authRef = useRef(auth);
   useEffect(() => { authRef.current = auth; }, [auth]);
@@ -52,40 +43,36 @@ export default function AuthProvider({ children, location, navigate }: AuthProvi
     else localStorage.removeItem("auth");
   }, [auth]);
 
-  const handleCallback = useCallback(
-    async (code: string) => {
-      const codeVerifier = localStorage.getItem("pkce_verifier") || "";
-      const body = new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: REDIRECT_URI,
-        client_id: CLIENT_ID,
-        code_verifier: codeVerifier,
+  const handleCallback = useCallback(async (code: string) => {
+    const codeVerifier = localStorage.getItem("pkce_verifier") || "";
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: REDIRECT_URI,
+      client_id: CLIENT_ID,
+      code_verifier: codeVerifier,
+    });
+
+    try {
+      const response = await apiClient.post(TOKEN_URL, body);
+      setAuth({
+        accessToken: response.data.access_token,
+        refreshToken: response.data.refresh_token,
+        expiresIn: response.data.expires_in,
+        createdAt: Date.now(),
       });
+      setShowIframe(false);
+      setManualLogout(false);
 
-      try {
-        const response = await apiClient.post(TOKEN_URL, body);
-        setAuth({
-          accessToken: response.data.access_token,
-          refreshToken: response.data.refresh_token,
-          expiresIn: response.data.expires_in,
-          createdAt: Date.now(),
-        });
-        setShowIframe(false);
-        setManualLogout(false);
+      const lastPath = localStorage.getItem("lastPath") || "/";
+      localStorage.removeItem("lastPath");
+      window.location.replace(lastPath);
 
-        if (shouldRedirectAfterLogin && lastPath) {
-          currentNavigate(lastPath, { replace: true });
-          setShouldRedirectAfterLogin(false);
-          setLastPath(null);
-        }
-      } catch (err: any) {
-        console.error("Falha no login:", err.response?.data || err.message);
-        setShowIframe(true);
-      }
-    },
-    [lastPath, shouldRedirectAfterLogin, currentNavigate]
-  );
+    } catch (err: any) {
+      console.error("Falha no login:", err.response?.data || err.message);
+      setShowIframe(true);
+    }
+  }, []);
 
   const login = useCallback(async () => {
     const { codeVerifier, codeChallenge } = await generatePKCE();
@@ -115,6 +102,7 @@ export default function AuthProvider({ children, location, navigate }: AuthProvi
     setManualLogout(true);
   }, []);
 
+  // Intervalo para monitorar token
   useEffect(() => {
     const interval = setInterval(() => {
       const currentAuth = authRef.current;
@@ -132,21 +120,15 @@ export default function AuthProvider({ children, location, navigate }: AuthProvi
     if (!auth && !manualLogout) login();
   }, [auth, manualLogout, login]);
 
-  const checkLogin = useCallback(
-    (redirectBack: boolean = false) => {
-      if (redirectBack) {
-        setLastPath(currentLocation.pathname);
-        setShouldRedirectAfterLogin(true);
-      }
-      login();
-    },
-    [currentLocation.pathname, login]
-  );
+  const checkLogin = useCallback((redirectBack: boolean = false) => {
+    if (redirectBack) {
+      localStorage.setItem("lastPath", window.location.pathname);
+    }
+    login();
+  }, [login]);
 
   return (
-    <AuthContext.Provider
-      value={{ auth, login, logout, handleCallback, checkLogin }}
-    >
+    <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin }}>
       {children}
       {showIframe && (
         <iframe

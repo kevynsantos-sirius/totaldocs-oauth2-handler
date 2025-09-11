@@ -1,22 +1,17 @@
-import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
+// src/App.jsx
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuthProvider from "./auth/AuthProvider";
-import {getCallbackRoute} from "./CallbackRoute";
-
-function AuthWrapper() {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  return (
-    <AuthProvider location={location} navigate={navigate}>
-      {getCallbackRoute({ location, navigate })}
-    </AuthProvider>
-  );
-}
+import { getCallbackRoute } from "./CallbackRoute";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthWrapper />
+      <AuthProvider>
+        <Routes>
+          {getCallbackRoute()}       {/* Callback */}
+          <Route path="*" element={null} /> {/* rota default vazia */}
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
