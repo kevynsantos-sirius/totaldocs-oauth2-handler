@@ -9,5 +9,9 @@ interface CallbackRouteProps {
 }
 
 export function getCallbackRoute({ location, navigate }: CallbackRouteProps) {
+  console.log(location);
+  console.log(navigate);
+  if (!location || !navigate) return <></>; // retorna fragment vazio se não tiver
   return <Route path="/callback" element={<Callback location={location} navigate={navigate} />} />;
 }
+
