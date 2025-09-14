@@ -122,9 +122,12 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   }, [login]);
 
   // Login automático somente se não houver auth e não tiver logout manual
-  useEffect(() => {
-    if (!auth && !manualLogout) login();
-  }, [auth, manualLogout, login]);
+useEffect(() => {
+  const storedAuth = localStorage.getItem("auth");
+  if (!auth && !manualLogout && !storedAuth) {
+    login();
+  }
+}, [auth, manualLogout, login]);
 
   // checkLogin: salva rota atual antes de disparar login
   const checkLogin = useCallback((redirectBack: boolean = false) => {
