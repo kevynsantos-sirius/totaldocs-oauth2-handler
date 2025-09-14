@@ -1,14 +1,16 @@
 import useAuth from "../auth/useAuth";
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Callback() {
   const { handleCallback } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // 🔑 verifica se já existe sessão salva
     const storedAuth = localStorage.getItem("auth");
     if (storedAuth) {
       console.log("Sessão já encontrada, ignorando callback");
+      navigate("/", { replace: true }); // ou lastPath
       return;
     }
 
@@ -21,16 +23,14 @@ export default function Callback() {
         console.log("Passei no callback: " + lastPath);
         localStorage.removeItem("lastPath");
 
-        // limpa o "code" da URL para evitar repetir no reload
         window.history.replaceState({}, document.title, window.location.pathname);
-
-        window.location.replace(lastPath);
+        navigate(lastPath, { replace: true }); // ✅ mantém o SPA funcionando
       });
     } else {
       console.error("Callback sem código OAuth2!");
-      window.location.replace("/");
+      navigate("/", { replace: true });
     }
-  }, [handleCallback]);
+  }, [handleCallback, navigate]);
 
   return null;
 }
