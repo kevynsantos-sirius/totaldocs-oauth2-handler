@@ -1,3 +1,4 @@
+// src/auth/SessionGuard.tsx
 import { useEffect, Fragment } from "react";
 import useAuth from "./useAuth";
 
@@ -6,12 +7,13 @@ interface SessionGuardProps {
 }
 
 export default function SessionGuard({ children }: SessionGuardProps) {
-  const { checkLogin } = useAuth();
+  const { auth, checkLogin } = useAuth();
 
   useEffect(() => {
-    // Sempre que o componente montar, registra a rota atual no localStorage
-    checkLogin(true);
-  }, [checkLogin]);
+    if (!auth) {
+      checkLogin(true); // dispara login apenas se não houver sessão
+    }
+  }, [auth, checkLogin]);
 
   return <Fragment>{children}</Fragment>;
 }

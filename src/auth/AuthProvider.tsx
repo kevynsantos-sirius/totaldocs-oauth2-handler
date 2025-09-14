@@ -1,3 +1,4 @@
+// src/auth/AuthProvider.tsx
 import { useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
@@ -43,6 +44,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     else localStorage.removeItem("auth");
   }, [auth]);
 
+  // Callback do OAuth
   const handleCallback = useCallback(async (code: string) => {
     const codeVerifier = localStorage.getItem("pkce_verifier") || "";
     const body = new URLSearchParams({
@@ -64,8 +66,10 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       setShowIframe(false);
       setManualLogout(false);
 
+      // Redireciona para a rota salva
       const lastPath = localStorage.getItem("lastPath") || "/";
       localStorage.removeItem("lastPath");
+      window.history.replaceState({}, document.title, window.location.pathname);
       window.location.replace(lastPath);
 
     } catch (err: any) {
@@ -74,6 +78,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  // Login
   const login = useCallback(async () => {
     const { codeVerifier, codeChallenge } = await generatePKCE();
     localStorage.setItem("pkce_verifier", codeVerifier);
@@ -116,14 +121,14 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     return () => clearInterval(interval);
   }, [login]);
 
+  // Login automático somente se não houver auth e não tiver logout manual
   useEffect(() => {
     if (!auth && !manualLogout) login();
   }, [auth, manualLogout, login]);
 
+  // checkLogin: salva rota atual antes de disparar login
   const checkLogin = useCallback((redirectBack: boolean = false) => {
-    if (redirectBack) {
-      localStorage.setItem("lastPath", window.location.pathname);
-    }
+    if (redirectBack) localStorage.setItem("lastPath", window.location.pathname);
     login();
   }, [login]);
 
