@@ -35,6 +35,8 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   const [showIframe, setShowIframe] = useState(false);
   const [iframeSrc, setIframeSrc] = useState("");
   const [manualLogout, setManualLogout] = useState(false);
+  const [loginCompleted, setLoginCompleted] = useState(false);
+
 
   const authRef = useRef(auth);
   useEffect(() => { authRef.current = auth; }, [auth]);
@@ -65,6 +67,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       });
       setShowIframe(false);
       setManualLogout(false);
+      setLoginCompleted(true);
 
       // Redireciona para a rota salva
       const lastPath = localStorage.getItem("lastPath") || "/";
@@ -124,10 +127,10 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   // Login automático somente se não houver auth e não tiver logout manual
 useEffect(() => {
   const storedAuth = localStorage.getItem("auth");
-  if (!auth && !manualLogout && !storedAuth) {
+  if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
     login();
   }
-}, [auth, manualLogout, login]);
+}, [auth, manualLogout, loginCompleted, login]);
 
   // checkLogin: salva rota atual antes de disparar login
   const checkLogin = useCallback((redirectBack: boolean = false) => {
