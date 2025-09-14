@@ -7,13 +7,13 @@ interface SessionGuardProps {
 }
 
 export default function SessionGuard({ children }: SessionGuardProps) {
-  const { auth, checkLogin } = useAuth();
+  const { checkLogin } = useAuth();
 
-  useEffect(() => {
-    if (!auth) {
-      checkLogin(true); // dispara login apenas se não houver sessão
-    }
-  }, [auth, checkLogin]);
+useEffect(() => {
+  const storedAuth = localStorage.getItem("auth");
+  if (!storedAuth) checkLogin(true);
+}, [checkLogin]);
+
 
   return <Fragment>{children}</Fragment>;
 }
