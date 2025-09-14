@@ -11,6 +11,7 @@ export default function Callback() {
     if (code) {
       handleCallback(code).then(() => {
         const lastPath = localStorage.getItem("lastPath") || "/";
+        console.log("passei no callback:"+lastPath);
         localStorage.removeItem("lastPath");
         window.location.replace(lastPath); // redireciona para a rota salva
       });
