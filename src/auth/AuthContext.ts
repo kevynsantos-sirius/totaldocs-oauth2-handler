@@ -13,6 +13,7 @@ export interface AuthContextType {
   logout: () => void;
   handleCallback: (code: string) => Promise<void>;
   checkLogin: (redirectBack?: boolean) => void;
+  showIframe: (visible: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -21,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   handleCallback: async () => {},
   checkLogin: () => {},
+  showIframe: () => {}
 });
 
 export default AuthContext;

@@ -44,7 +44,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     else localStorage.removeItem("auth");
   }, [auth]);
 
-  const showIframe = (visible: boolean) => {
+  const showIframe = useCallback((visible: boolean) => {
   const iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
   if (!iframe)
   {
@@ -63,7 +63,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     iframe.style.pointerEvents = "none";
     iframe.style.opacity = "0";
   }
-};
+},[]);
 
   const handleCallback = useCallback(async (code: string) => {
     const codeVerifier = localStorage.getItem("pkce_verifier") || "";
@@ -153,7 +153,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   }, [login]);
 
   return (
-    <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin }}>
+    <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin, showIframe }}>
       {children}
       <iframe
         id="oauth2-iframe"

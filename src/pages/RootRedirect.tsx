@@ -8,7 +8,7 @@ interface RootRedirectProps {
 }
 
 export default function RootRedirect({ main }: RootRedirectProps) {
-  const { auth, checkLogin } = useAuth();
+  const { auth, checkLogin, showIframe } = useAuth();
 
   useEffect(() => {
     if (auth) {
@@ -17,9 +17,11 @@ export default function RootRedirect({ main }: RootRedirectProps) {
       localStorage.removeItem("lastPath");
       console.log(lastPath);
       window.location.replace(lastPath);
+      showIframe(false);
     } else {
       // sem sessão → dispara login automático
       checkLogin(true);
+      showIframe(true);
     }
   }, [auth, checkLogin, main]);
 
