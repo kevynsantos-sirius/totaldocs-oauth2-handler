@@ -4,6 +4,54 @@ import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
 
+// Função para criar o iframe se ele ainda não existir
+function buildIframe(src: string) {
+  // Verifica se o iframe já existe
+  let iframe = document.getElementById("iframe-oauth2") as HTMLIFrameElement;
+
+  if (!iframe) {
+    // Cria o iframe apenas se não existir
+    iframe = document.createElement("iframe");
+    iframe.id = "iframe-oauth2";
+    iframe.src = src;
+    iframe.title = "OAuth Login";
+    iframe.style.position = "fixed";
+    iframe.style.top = "0";
+    iframe.style.left = "0";
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.style.border = "none";
+    iframe.style.zIndex = "9999";
+    iframe.style.background = "white";
+
+    // Adiciona o iframe ao corpo da página
+    document.body.appendChild(iframe);
+  }
+  else {
+    // Se o iframe já existe, chama showIframe com o src
+    showIframe(src);
+  }
+}
+
+// Função para esconder o iframe
+function hideIframe() {
+  const iframe = document.getElementById("iframe-oauth2") as HTMLIFrameElement;
+  if (iframe) {
+    iframe.style.display = "none";
+  }
+}
+
+// Função para mostrar o iframe e atualizar o src
+function showIframe(src: string) {
+  const iframe = document.getElementById("iframe-oauth2") as HTMLIFrameElement;
+  if (iframe) {
+    iframe.style.display = "block"; // Torna o iframe visível
+    iframe.src = src; // Atualiza o src do iframe
+  }
+}
+
+
+
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
@@ -31,8 +79,6 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     }
     return null;
   });
-
-  const [showIframe, setShowIframe] = useState(false);
   const [iframeSrc, setIframeSrc] = useState("");
   const [manualLogout, setManualLogout] = useState(false);
   const [loginCompleted, setLoginCompleted] = useState(false);
@@ -65,7 +111,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         expiresIn: response.data.expires_in,
         createdAt: Date.now(),
       });
-      setShowIframe(false);
+      hideIframe();
       setManualLogout(false);
       setLoginCompleted(true);
 
@@ -77,7 +123,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
 
     } catch (err: any) {
       console.error("Falha no login:", err.response?.data || err.message);
-      setShowIframe(true);
+      buildIframe(iframeSrc);
     }
   }, []);
 
@@ -91,7 +137,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
     setIframeSrc(url);
-    setShowIframe(true);
+    buildIframe(iframeSrc);
 
     const messageListener = (event: MessageEvent) => {
       if (event.origin !== window.origin) return;
@@ -106,7 +152,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem("auth");
     localStorage.removeItem("pkce_verifier");
     setAuth(null);
-    setShowIframe(false);
+    hideIframe();
     setManualLogout(true);
   }, []);
 
@@ -115,7 +161,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     const interval = setInterval(() => {
       const currentAuth = authRef.current;
       if (!currentAuth?.expiresIn) {
-        setShowIframe(true);
+        buildIframe(iframeSrc);
         return;
       }
       const ageInSeconds = Math.floor((Date.now() - currentAuth.createdAt) / 1000);
@@ -141,22 +187,6 @@ useEffect(() => {
   return (
     <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin }}>
       {children}
-      {showIframe && (
-        <iframe
-          src={iframeSrc}
-          title="OAuth Login"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            border: "none",
-            zIndex: 9999,
-            background: "white",
-          }}
-        />
-      )}
     </AuthContext.Provider>
   );
 }
