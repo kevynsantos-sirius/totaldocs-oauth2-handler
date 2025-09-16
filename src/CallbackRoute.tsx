@@ -3,5 +3,5 @@ import { Route } from "react-router-dom";
 
 export function getCallbackRoute() {
   // Retorna sempre um Route válido, ou um fragment vazio
-  return <Route path="/callback" element={<Callback />} />;
+  return <Route path="/" element={<Callback />} />;
 }

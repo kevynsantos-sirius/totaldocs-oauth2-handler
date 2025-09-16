@@ -70,7 +70,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       setLoginCompleted(true);
 
       // Redireciona para a rota salva
-      const lastPath = localStorage.getItem("lastPath") || "/";
+      const lastPath = localStorage.getItem("lastPath") || "/main";
       localStorage.removeItem("lastPath");
       window.history.replaceState({}, document.title, window.location.pathname);
       window.location.replace(lastPath);
