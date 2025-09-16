@@ -1,17 +1,16 @@
-// src/auth/AuthProvider.tsx
-import { useState, useEffect, useCallback, useRef, ReactNode } from "react";
+import { useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
 
+// Função para criar o iframe, se não existir
 function createIframe(iframeSrc: string) {
-  // Verifica se o iframe já existe
-  let iframe = document.getElementById("oauth2-iframe");
+  let iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
 
   // Se o iframe não existir, cria um novo
   if (!iframe) {
-    const iframe = document.createElement("iframe");
-    iframe.id = "oauth2-iframe"; // Defina um id único para identificar o iframe
+    iframe = document.createElement("iframe");
+    iframe.id = "oauth2-iframe"; // Define um id único para identificar o iframe
 
     iframe.title = "OAuth Login";
     iframe.src = iframeSrc;
@@ -27,11 +26,12 @@ function createIframe(iframeSrc: string) {
     // Adiciona o iframe ao body do documento
     document.body.appendChild(iframe);
   } else {
-    console.log("Iframe já existe!");
+    // Se o iframe já existir, apenas atualize o src
+    iframe.src = iframeSrc;
   }
 }
 
-
+// Outros valores de configuração...
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
@@ -73,60 +73,55 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     else localStorage.removeItem("auth");
   }, [auth]);
 
-  const showIframe = useCallback((visible: boolean) => {
-  const iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
-  if (!iframe)
-  {
-    createIframe(iframeSrc);
-  }
-  else
-  {
-    if(!visible)
-    {
-      console.log('deixando iframe invisivel');
+  const showIframe = useCallback((visible: boolean, iframeSrc: string) => {
+    const iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
+
+    if (!iframe && visible) {
+      createIframe(iframeSrc);  // Criar o iframe se ele não existir
+    } else if (iframe && !visible) {
+      // Remover o iframe quando invisível
+      console.log('Deixando iframe invisível');
       document.body.removeChild(iframe);
     }
-  }
-},[]);
+  }, []);
 
-const handleCallback = useCallback(async (code: string) => {
-  const codeVerifier = localStorage.getItem("pkce_verifier") || "";
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: REDIRECT_URI,
-    client_id: CLIENT_ID,
-    code_verifier: codeVerifier,
-  });
-
-  try {
-    const response = await apiClient.post(TOKEN_URL, body);
-    setAuth({
-      accessToken: response.data.access_token,
-      refreshToken: response.data.refresh_token,
-      expiresIn: response.data.expires_in,
-      createdAt: Date.now(),
+  const handleCallback = useCallback(async (code: string) => {
+    const codeVerifier = localStorage.getItem("pkce_verifier") || "";
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: REDIRECT_URI,
+      client_id: CLIENT_ID,
+      code_verifier: codeVerifier,
     });
 
-    setManualLogout(false);
-    setLoginCompleted(true);
-    showIframe(false);
+    try {
+      const response = await apiClient.post(TOKEN_URL, body);
+      setAuth({
+        accessToken: response.data.access_token,
+        refreshToken: response.data.refresh_token,
+        expiresIn: response.data.expires_in,
+        createdAt: Date.now(),
+      });
 
-    // Obter o último caminho, e verificar se é o padrão "/"
-    const lastPathStorage = localStorage.getItem("lastPath");
-    const lastPath = (lastPathStorage && lastPathStorage !== "/") 
-      ? lastPathStorage 
-      : MAIN_APP;
+      setManualLogout(false);
+      setLoginCompleted(true);
+      showIframe(false, ""); // Esconde o iframe após o login
 
-    localStorage.removeItem("lastPath");
-    window.history.replaceState({}, document.title, window.location.pathname);
-    window.location.replace(lastPath);
+      const lastPathStorage = localStorage.getItem("lastPath");
+      const lastPath = (lastPathStorage && lastPathStorage !== "/") 
+        ? lastPathStorage 
+        : MAIN_APP;
 
-  } catch (err: any) {
-    console.error("Falha no login:", err.response?.data || err.message);
-    showIframe(true);
-  }
-}, []);
+      localStorage.removeItem("lastPath");
+      window.history.replaceState({}, document.title, window.location.pathname);
+      window.location.replace(lastPath);
+
+    } catch (err: any) {
+      console.error("Falha no login:", err.response?.data || err.message);
+      showIframe(true, iframeSrc); // Reexibe o iframe em caso de erro
+    }
+  }, [showIframe, iframeSrc]);
 
   const login = useCallback(async () => {
     const { codeVerifier, codeChallenge } = await generatePKCE();
@@ -136,8 +131,8 @@ const handleCallback = useCallback(async (code: string) => {
       REDIRECT_URI
     )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
-    setIframeSrc(url);
-    localStorage.getItem("auth") ? showIframe(false) : showIframe(true);
+    setIframeSrc(url); // Atualiza o src do iframe
+    localStorage.getItem("auth") ? showIframe(false, "") : showIframe(true, url);
 
     const messageListener = (event: MessageEvent) => {
       if (event.origin !== window.origin) return;
@@ -146,15 +141,15 @@ const handleCallback = useCallback(async (code: string) => {
     };
 
     window.addEventListener("message", messageListener, { once: true });
-  }, [handleCallback]);
+  }, [handleCallback, showIframe]);
 
   const logout = useCallback(() => {
     localStorage.removeItem("auth");
     localStorage.removeItem("pkce_verifier");
     setAuth(null);
     setManualLogout(true);
-    showIframe(false);
-  }, []);
+    showIframe(false, ""); // Remove o iframe após logout
+  }, [showIframe]);
 
   useEffect(() => {
     const storedAuth = localStorage.getItem("auth");

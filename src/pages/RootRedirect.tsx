@@ -15,7 +15,7 @@ export default function RootRedirect({ main }: RootRedirectProps) {
       // já autenticado → redireciona para rota principal
       const lastPath = main;
       window.location.replace(lastPath);
-      showIframe(false);
+      showIframe(false,"");
     } else {
       // sem sessão → dispara login automático
       checkLogin(true);
