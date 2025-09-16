@@ -1,33 +1,31 @@
-// src/pages/RootRedirect.tsx
-import { useEffect, ReactNode } from "react";
+import { useEffect, useState, ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import useAuth from "../auth/useAuth";
 
 interface RootRedirectProps {
-  /** Componente a ser renderizado se o usuário estiver autenticado */
   pageComponent: ReactNode;
-  /** Rota padrão para onde redirecionar após login */
   main: string;
 }
 
-export default function RootRedirect({ pageComponent }: RootRedirectProps) {
-  const { auth, checkLogin } = useAuth();
+export default function RootRedirect({ pageComponent, main }: RootRedirectProps) {
+  const { checkLogin } = useAuth();
+  const navigate = useNavigate();
+  const [hasAuth, setHasAuth] = useState<boolean>(() => !!localStorage.getItem("auth"));
 
   useEffect(() => {
-    if (!auth) {
-       checkLogin(true);
+    if (!hasAuth) {
+      checkLogin(true);
+      // ou navega direto:
+      navigate(main);
     }
-  }, [auth, checkLogin]);
+  }, [hasAuth, checkLogin, navigate, main]);
 
-  if (auth) {
-    // Se autenticado, retorna o componente passado
-    return <>{pageComponent}</>;
-  } else {
-    // Se não autenticado, retorna uma mensagem de erro
-    return (
-      <div>
-        <h1>Sessão expirada</h1>
-        <p>Redirecionando novamente para entrar.</p>
-      </div>
-    );
-  }
+  return hasAuth ? (
+    <>{pageComponent}</>
+  ) : (
+    <div>
+      <h1>Sessão expirada</h1>
+      <p>Redirecionando novamente para entrar.</p>
+    </div>
+  );
 }
