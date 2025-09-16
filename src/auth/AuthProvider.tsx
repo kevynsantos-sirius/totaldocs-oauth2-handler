@@ -82,7 +82,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         document.body.removeChild(iframe); // Remove o iframe quando invisível
       }
     }
-  }, [iframeSrc]);
+  }, []);
 
   const handleCallback = useCallback(async (code: string) => {
     const codeVerifier = localStorage.getItem("pkce_verifier") || "";
