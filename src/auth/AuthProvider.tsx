@@ -35,7 +35,6 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   const [manualLogout, setManualLogout] = useState(false);
   const [loginCompleted, setLoginCompleted] = useState(false);
   const [iframeSrc, setIframeSrc] = useState("");
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const authRef = useRef(auth);
   useEffect(() => { authRef.current = auth; }, [auth]);
@@ -46,13 +45,13 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   }, [auth]);
 
   const showIframe = (visible: boolean) => {
-    if (iframeRef.current) {
-      iframeRef.current.style.visibility = visible ? "visible" : "hidden";
-      iframeRef.current.style.pointerEvents = visible ? "auto" : "none";
+    const iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
+    if (iframe) {
+      iframe.style.visibility = visible ? "visible" : "hidden";
+      iframe.style.pointerEvents = visible ? "auto" : "none";
     }
   };
 
-  // Callback do OAuth
   const handleCallback = useCallback(async (code: string) => {
     const codeVerifier = localStorage.getItem("pkce_verifier") || "";
     const body = new URLSearchParams({
@@ -74,7 +73,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
 
       setManualLogout(false);
       setLoginCompleted(true);
-      showIframe(false); // oculta iframe após login
+      showIframe(false);
 
       const lastPath = localStorage.getItem("lastPath") || "/main";
       localStorage.removeItem("lastPath");
@@ -115,7 +114,6 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     showIframe(false);
   }, []);
 
-  // Intervalo para monitorar token
   useEffect(() => {
     const interval = setInterval(() => {
       const currentAuth = authRef.current;
@@ -129,7 +127,6 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     return () => clearInterval(interval);
   }, [login]);
 
-  // Login automático somente se não houver auth e não tiver logout manual
   useEffect(() => {
     const storedAuth = localStorage.getItem("auth");
     if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
@@ -146,7 +143,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin }}>
       {children}
       <iframe
-        ref={iframeRef}
+        id="oauth2-iframe"
         src={iframeSrc}
         title="OAuth Login"
         style={{
