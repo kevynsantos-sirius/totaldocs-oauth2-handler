@@ -5,8 +5,9 @@ import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
 
 // Função para criar o iframe se ele ainda não existir
-function buildIframe(src: string) {
+function buildIframe() {
   // Verifica se o iframe já existe
+  const src = localStorage.getItem("urlIframe") || "";
   let iframe = document.getElementById("iframe-oauth2") as HTMLIFrameElement;
 
   if (!iframe) {
@@ -29,7 +30,7 @@ function buildIframe(src: string) {
   }
   else {
     // Se o iframe já existe, chama showIframe com o src
-    showIframe(src);
+    showIframe();
   }
 }
 
@@ -42,7 +43,8 @@ function hideIframe() {
 }
 
 // Função para mostrar o iframe e atualizar o src
-function showIframe(src: string) {
+function showIframe() {
+  const src = localStorage.getItem("urlIframe") || "";
   const iframe = document.getElementById("iframe-oauth2") as HTMLIFrameElement;
   if (iframe) {
     iframe.style.display = "block"; // Torna o iframe visível
@@ -79,7 +81,6 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     }
     return null;
   });
-  const [iframeSrc, setIframeSrc] = useState("");
   const [manualLogout, setManualLogout] = useState(false);
   const [loginCompleted, setLoginCompleted] = useState(false);
 
@@ -123,7 +124,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
 
     } catch (err: any) {
       console.error("Falha no login:", err.response?.data || err.message);
-      buildIframe(iframeSrc);
+      buildIframe();
     }
   }, []);
 
@@ -136,8 +137,8 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       REDIRECT_URI
     )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
-    setIframeSrc(url);
-    buildIframe(iframeSrc);
+    localStorage.setItem("urlIframe",url);
+    buildIframe();
 
     const messageListener = (event: MessageEvent) => {
       if (event.origin !== window.origin) return;
@@ -161,7 +162,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     const interval = setInterval(() => {
       const currentAuth = authRef.current;
       if (!currentAuth?.expiresIn) {
-        buildIframe(iframeSrc);
+        buildIframe();
         return;
       }
       const ageInSeconds = Math.floor((Date.now() - currentAuth.createdAt) / 1000);
