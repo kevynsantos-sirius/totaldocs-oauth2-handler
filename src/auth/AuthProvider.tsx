@@ -31,7 +31,6 @@ function createIframe(iframeSrc: string) {
   }
 }
 
-// Outros valores de configuração...
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
@@ -63,7 +62,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
 
   const [manualLogout, setManualLogout] = useState(false);
   const [loginCompleted, setLoginCompleted] = useState(false);
-  const [iframeSrc, setIframeSrc] = useState("");
+  const [iframeSrc, setIframeSrc] = useState(""); // URL do iframe
 
   const authRef = useRef(auth);
   useEffect(() => { authRef.current = auth; }, [auth]);
@@ -82,8 +81,13 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       // Remover o iframe quando invisível
       console.log('Deixando iframe invisível');
       document.body.removeChild(iframe);
+    } else if (iframe && visible) {
+      // Exibir o iframe, caso já exista
+      iframe.style.visibility = "visible";
+      iframe.style.pointerEvents = "auto";
+      iframe.style.opacity = "1";
     }
-  }, []);
+  }, []); // Não dependa de iframeSrc aqui
 
   const handleCallback = useCallback(async (code: string) => {
     const codeVerifier = localStorage.getItem("pkce_verifier") || "";
@@ -121,9 +125,11 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       console.error("Falha no login:", err.response?.data || err.message);
       showIframe(true, iframeSrc); // Reexibe o iframe em caso de erro
     }
-  }, [showIframe, iframeSrc]);
+  }, [showIframe]); // Aqui ainda mantém `iframeSrc`, mas não é alterado dentro da função
 
   const login = useCallback(async () => {
+    if (loginCompleted) return;  // Evita chamadas repetidas se já foi concluído
+
     const { codeVerifier, codeChallenge } = await generatePKCE();
     localStorage.setItem("pkce_verifier", codeVerifier);
 
@@ -141,7 +147,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     };
 
     window.addEventListener("message", messageListener, { once: true });
-  }, [handleCallback, showIframe]);
+  }, [handleCallback, showIframe, loginCompleted]); // Evitar loop de re-execução
 
   const logout = useCallback(() => {
     localStorage.removeItem("auth");
