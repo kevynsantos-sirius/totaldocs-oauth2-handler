@@ -32,11 +32,10 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     return null;
   });
 
-  const [showIframe, setShowIframe] = useState(false);
-  const [iframeSrc, setIframeSrc] = useState("");
   const [manualLogout, setManualLogout] = useState(false);
   const [loginCompleted, setLoginCompleted] = useState(false);
-
+  const [iframeSrc, setIframeSrc] = useState("");
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const authRef = useRef(auth);
   useEffect(() => { authRef.current = auth; }, [auth]);
@@ -45,6 +44,13 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     if (auth) localStorage.setItem("auth", JSON.stringify(auth));
     else localStorage.removeItem("auth");
   }, [auth]);
+
+  const showIframe = (visible: boolean) => {
+    if (iframeRef.current) {
+      iframeRef.current.style.visibility = visible ? "visible" : "hidden";
+      iframeRef.current.style.pointerEvents = visible ? "auto" : "none";
+    }
+  };
 
   // Callback do OAuth
   const handleCallback = useCallback(async (code: string) => {
@@ -65,11 +71,11 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         expiresIn: response.data.expires_in,
         createdAt: Date.now(),
       });
-      setShowIframe(false);
+
       setManualLogout(false);
       setLoginCompleted(true);
+      showIframe(false); // oculta iframe após login
 
-      // Redireciona para a rota salva
       const lastPath = localStorage.getItem("lastPath") || "/main";
       localStorage.removeItem("lastPath");
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -77,11 +83,10 @@ export default function AuthProvider({ children }: AuthProviderProps) {
 
     } catch (err: any) {
       console.error("Falha no login:", err.response?.data || err.message);
-      setShowIframe(true);
+      showIframe(true);
     }
   }, []);
 
-  // Login
   const login = useCallback(async () => {
     const { codeVerifier, codeChallenge } = await generatePKCE();
     localStorage.setItem("pkce_verifier", codeVerifier);
@@ -91,7 +96,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
     setIframeSrc(url);
-    setShowIframe(true);
+    showIframe(true);
 
     const messageListener = (event: MessageEvent) => {
       if (event.origin !== window.origin) return;
@@ -106,8 +111,8 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem("auth");
     localStorage.removeItem("pkce_verifier");
     setAuth(null);
-    setShowIframe(false);
     setManualLogout(true);
+    showIframe(false);
   }, []);
 
   // Intervalo para monitorar token
@@ -115,7 +120,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     const interval = setInterval(() => {
       const currentAuth = authRef.current;
       if (!currentAuth?.expiresIn) {
-        setShowIframe(true);
+        showIframe(true);
         return;
       }
       const ageInSeconds = Math.floor((Date.now() - currentAuth.createdAt) / 1000);
@@ -125,14 +130,13 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   }, [login]);
 
   // Login automático somente se não houver auth e não tiver logout manual
-useEffect(() => {
-  const storedAuth = localStorage.getItem("auth");
-  if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
-    login();
-  }
-}, [auth, manualLogout, loginCompleted, login]);
+  useEffect(() => {
+    const storedAuth = localStorage.getItem("auth");
+    if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
+      login();
+    }
+  }, [auth, manualLogout, loginCompleted, login]);
 
-  // checkLogin: salva rota atual antes de disparar login
   const checkLogin = useCallback((redirectBack: boolean = false) => {
     if (redirectBack) localStorage.setItem("lastPath", window.location.pathname);
     login();
@@ -141,22 +145,23 @@ useEffect(() => {
   return (
     <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin }}>
       {children}
-      {showIframe && (
-        <iframe
-          src={iframeSrc}
-          title="OAuth Login"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            border: "none",
-            zIndex: 9999,
-            background: "white",
-          }}
-        />
-      )}
+      <iframe
+        ref={iframeRef}
+        src={iframeSrc}
+        title="OAuth Login"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          border: "none",
+          zIndex: 9999,
+          background: "white",
+          visibility: "hidden", // começa escondido
+          pointerEvents: "none",
+        }}
+      />
     </AuthContext.Provider>
   );
 }
