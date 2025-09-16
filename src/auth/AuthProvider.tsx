@@ -45,12 +45,25 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   }, [auth]);
 
   const showIframe = (visible: boolean) => {
-    const iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
-    if (iframe) {
-      iframe.style.visibility = visible ? "visible" : "hidden";
-      iframe.style.pointerEvents = visible ? "auto" : "none";
-    }
-  };
+  const iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
+  if (!iframe)
+  {
+    console.log('iframe nao existe, ignorando');
+    return;
+  }
+
+  if (visible) {
+    console.log('deixando iframe visivel');
+    iframe.style.visibility = "visible";
+    iframe.style.pointerEvents = "auto";
+    iframe.style.opacity = "1";
+  } else {
+    console.log('deixando iframe invisivel');
+    iframe.style.visibility = "hidden";
+    iframe.style.pointerEvents = "none";
+    iframe.style.opacity = "0";
+  }
+};
 
   const handleCallback = useCallback(async (code: string) => {
     const codeVerifier = localStorage.getItem("pkce_verifier") || "";
