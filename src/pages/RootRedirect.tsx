@@ -11,12 +11,11 @@ export default function RootRedirect({ main }: RootRedirectProps) {
   const { auth, checkLogin } = useAuth();
 
   useEffect(() => {
-    console.log(localStorage.getItem("lastPath") );
-    console.log(main);
     if (auth) {
       // já autenticado → redireciona para rota principal
       const lastPath = localStorage.getItem("lastPath") || main;
       localStorage.removeItem("lastPath");
+      console.log(lastPath);
       window.location.replace(lastPath);
     } else {
       // sem sessão → dispara login automático
