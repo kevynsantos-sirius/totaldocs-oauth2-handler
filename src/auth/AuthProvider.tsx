@@ -1,3 +1,4 @@
+// src/auth/AuthProvider.tsx
 import { useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
@@ -45,82 +46,64 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   }, [auth]);
 
   const showIframe = useCallback((visible: boolean) => {
-    let iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
+  const iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
+  if (!iframe)
+  {
+    console.log('iframe nao existe, ignorando');
+    return;
+  }
 
-    if (visible && !iframe) {
-      // Se o iframe não existir, cria e adiciona ao DOM
-      iframe = document.createElement("iframe");
-      iframe.id = "oauth2-iframe";
-      iframe.src = iframeSrc;
-      iframe.title = "OAuth Login";
-      iframe.style.position = "fixed";
-      iframe.style.top = "0";
-      iframe.style.left = "0";
-      iframe.style.width = "100%";
-      iframe.style.height = "100%";
-      iframe.style.border = "none";
-      iframe.style.zIndex = "9999";
-      iframe.style.background = "white";
-      iframe.style.visibility = "hidden"; // Inicialmente invisível
-      iframe.style.pointerEvents = "none";
+  if (visible) {
+    console.log('deixando iframe visivel');
+    iframe.style.visibility = "visible";
+    iframe.style.pointerEvents = "auto";
+    iframe.style.opacity = "1";
+  } else {
+    console.log('deixando iframe invisivel');
+    iframe.style.visibility = "hidden";
+    iframe.style.pointerEvents = "none";
+    iframe.style.opacity = "0";
+  }
+},[]);
 
-      document.body.appendChild(iframe);
-    }
+const handleCallback = useCallback(async (code: string) => {
+  const codeVerifier = localStorage.getItem("pkce_verifier") || "";
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: REDIRECT_URI,
+    client_id: CLIENT_ID,
+    code_verifier: codeVerifier,
+  });
 
-    // Controla a visibilidade e os eventos de pointer
-    if (iframe) {
-      if (visible) {
-        console.log("deixando iframe visível");
-        iframe.style.visibility = "visible";
-        iframe.style.pointerEvents = "auto";
-        iframe.style.opacity = "1";
-      } else {
-        console.log("deixando iframe invisível");
-        iframe.style.visibility = "hidden";
-        iframe.style.pointerEvents = "none";
-        iframe.style.opacity = "0";
-        document.body.removeChild(iframe); // Remove o iframe quando invisível
-      }
-    }
-  }, []);
-
-  const handleCallback = useCallback(async (code: string) => {
-    const codeVerifier = localStorage.getItem("pkce_verifier") || "";
-    const body = new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: REDIRECT_URI,
-      client_id: CLIENT_ID,
-      code_verifier: codeVerifier,
+  try {
+    const response = await apiClient.post(TOKEN_URL, body);
+    setAuth({
+      accessToken: response.data.access_token,
+      refreshToken: response.data.refresh_token,
+      expiresIn: response.data.expires_in,
+      createdAt: Date.now(),
     });
 
-    try {
-      const response = await apiClient.post(TOKEN_URL, body);
-      setAuth({
-        accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-        expiresIn: response.data.expires_in,
-        createdAt: Date.now(),
-      });
+    setManualLogout(false);
+    setLoginCompleted(true);
+    showIframe(false);
 
-      setManualLogout(false);
-      setLoginCompleted(true);
-      showIframe(false);
+    // Obter o último caminho, e verificar se é o padrão "/"
+    const lastPathStorage = localStorage.getItem("lastPath");
+    const lastPath = (lastPathStorage && lastPathStorage !== "/") 
+      ? lastPathStorage 
+      : MAIN_APP;
 
-      const lastPathStorage = localStorage.getItem("lastPath");
-      const lastPath = (lastPathStorage && lastPathStorage !== "/")
-        ? lastPathStorage
-        : MAIN_APP;
+    localStorage.removeItem("lastPath");
+    window.history.replaceState({}, document.title, window.location.pathname);
+    window.location.replace(lastPath);
 
-      localStorage.removeItem("lastPath");
-      window.history.replaceState({}, document.title, window.location.pathname);
-      window.location.replace(lastPath);
-
-    } catch (err: any) {
-      console.error("Falha no login:", err.response?.data || err.message);
-      showIframe(true);
-    }
-  }, [showIframe]);
+  } catch (err: any) {
+    console.error("Falha no login:", err.response?.data || err.message);
+    showIframe(true);
+  }
+}, []);
 
   const login = useCallback(async () => {
     const { codeVerifier, codeChallenge } = await generatePKCE();
@@ -131,9 +114,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
     setIframeSrc(url);
-
-    // Cria o iframe e exibe-o
-    showIframe(true);
+    localStorage.getItem("auth") ? showIframe(false) : showIframe(true);
 
     const messageListener = (event: MessageEvent) => {
       if (event.origin !== window.origin) return;
@@ -142,15 +123,15 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     };
 
     window.addEventListener("message", messageListener, { once: true });
-  }, [handleCallback, showIframe]);
+  }, [handleCallback]);
 
   const logout = useCallback(() => {
     localStorage.removeItem("auth");
     localStorage.removeItem("pkce_verifier");
     setAuth(null);
     setManualLogout(true);
-    showIframe(false); // Remove o iframe após logout
-  }, [showIframe]);
+    showIframe(false);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -163,7 +144,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) login();
     }, 30000);
     return () => clearInterval(interval);
-  }, [login, showIframe]);
+  }, [login]);
 
   useEffect(() => {
     const storedAuth = localStorage.getItem("auth");
@@ -180,6 +161,23 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   return (
     <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin, showIframe }}>
       {children}
+      <iframe
+        id="oauth2-iframe"
+        src={iframeSrc}
+        title="OAuth Login"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          border: "none",
+          zIndex: 9999,
+          background: "white",
+          visibility: "hidden", // começa escondido
+          pointerEvents: "none",
+        }}
+      />
     </AuthContext.Provider>
   );
 }
