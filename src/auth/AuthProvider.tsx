@@ -9,6 +9,7 @@ const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
 const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
 const REFRESH_TIME = Number(import.meta.env.VITE_OAUTH2_REFRESH_TIME);
+const MAIN_APP = import.meta.env.VITE_MAIN_APP as string;
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -65,39 +66,44 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   }
 },[]);
 
-  const handleCallback = useCallback(async (code: string) => {
-    const codeVerifier = localStorage.getItem("pkce_verifier") || "";
-    const body = new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: REDIRECT_URI,
-      client_id: CLIENT_ID,
-      code_verifier: codeVerifier,
+const handleCallback = useCallback(async (code: string) => {
+  const codeVerifier = localStorage.getItem("pkce_verifier") || "";
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: REDIRECT_URI,
+    client_id: CLIENT_ID,
+    code_verifier: codeVerifier,
+  });
+
+  try {
+    const response = await apiClient.post(TOKEN_URL, body);
+    setAuth({
+      accessToken: response.data.access_token,
+      refreshToken: response.data.refresh_token,
+      expiresIn: response.data.expires_in,
+      createdAt: Date.now(),
     });
 
-    try {
-      const response = await apiClient.post(TOKEN_URL, body);
-      setAuth({
-        accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-        expiresIn: response.data.expires_in,
-        createdAt: Date.now(),
-      });
+    setManualLogout(false);
+    setLoginCompleted(true);
+    showIframe(false);
 
-      setManualLogout(false);
-      setLoginCompleted(true);
-      showIframe(false);
+    // Obter o último caminho, e verificar se é o padrão "/"
+    const lastPathStorage = localStorage.getItem("lastPath");
+    const lastPath = (lastPathStorage && lastPathStorage !== "/") 
+      ? lastPathStorage 
+      : MAIN_APP;
 
-      const lastPath = localStorage.getItem("lastPath") || "/main";
-      localStorage.removeItem("lastPath");
-      window.history.replaceState({}, document.title, window.location.pathname);
-      window.location.replace(lastPath);
+    localStorage.removeItem("lastPath");
+    window.history.replaceState({}, document.title, window.location.pathname);
+    window.location.replace(lastPath);
 
-    } catch (err: any) {
-      console.error("Falha no login:", err.response?.data || err.message);
-      showIframe(true);
-    }
-  }, []);
+  } catch (err: any) {
+    console.error("Falha no login:", err.response?.data || err.message);
+    showIframe(true);
+  }
+}, []);
 
   const login = useCallback(async () => {
     const { codeVerifier, codeChallenge } = await generatePKCE();
@@ -108,7 +114,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
     setIframeSrc(url);
-    showIframe(true);
+    localStorage.getItem("auth") ? showIframe(false) : showIframe(true);
 
     const messageListener = (event: MessageEvent) => {
       if (event.origin !== window.origin) return;

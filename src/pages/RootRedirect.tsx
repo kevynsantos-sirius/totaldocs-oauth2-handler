@@ -13,15 +13,12 @@ export default function RootRedirect({ main }: RootRedirectProps) {
   useEffect(() => {
     if (auth) {
       // já autenticado → redireciona para rota principal
-      const lastPath = localStorage.getItem("lastPath") || main;
-      localStorage.removeItem("lastPath");
-      console.log(lastPath);
+      const lastPath = main;
       window.location.replace(lastPath);
       showIframe(false);
     } else {
       // sem sessão → dispara login automático
       checkLogin(true);
-      showIframe(true);
     }
   }, [auth, checkLogin, main]);
 
