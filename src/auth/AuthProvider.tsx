@@ -4,6 +4,34 @@ import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
 
+function createIframe(iframeSrc: string) {
+  // Verifica se o iframe já existe
+  let iframe = document.getElementById("oauth2-iframe");
+
+  // Se o iframe não existir, cria um novo
+  if (!iframe) {
+    const iframe = document.createElement("iframe");
+    iframe.id = "oauth2-iframe"; // Defina um id único para identificar o iframe
+
+    iframe.title = "OAuth Login";
+    iframe.src = iframeSrc;
+    iframe.style.position = "fixed";
+    iframe.style.top = "0";
+    iframe.style.left = "0";
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.style.border = "none";
+    iframe.style.zIndex = "9999";
+    iframe.style.background = "white";
+
+    // Adiciona o iframe ao body do documento
+    document.body.appendChild(iframe);
+  } else {
+    console.log("Iframe já existe!");
+  }
+}
+
+
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
@@ -49,20 +77,15 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   const iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
   if (!iframe)
   {
-    console.log('iframe nao existe, ignorando');
-    return;
+    createIframe(iframeSrc);
   }
-
-  if (visible) {
-    console.log('deixando iframe visivel');
-    iframe.style.visibility = "visible";
-    iframe.style.pointerEvents = "auto";
-    iframe.style.opacity = "1";
-  } else {
-    console.log('deixando iframe invisivel');
-    iframe.style.visibility = "hidden";
-    iframe.style.pointerEvents = "none";
-    iframe.style.opacity = "0";
+  else
+  {
+    if(!visible)
+    {
+      console.log('deixando iframe invisivel');
+      document.body.removeChild(iframe);
+    }
   }
 },[]);
 
@@ -134,19 +157,6 @@ const handleCallback = useCallback(async (code: string) => {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const currentAuth = authRef.current;
-      if (!currentAuth?.expiresIn) {
-        showIframe(true);
-        return;
-      }
-      const ageInSeconds = Math.floor((Date.now() - currentAuth.createdAt) / 1000);
-      if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) login();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [login]);
-
-  useEffect(() => {
     const storedAuth = localStorage.getItem("auth");
     if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
       login();
@@ -161,23 +171,6 @@ const handleCallback = useCallback(async (code: string) => {
   return (
     <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin, showIframe }}>
       {children}
-      <iframe
-        id="oauth2-iframe"
-        src={iframeSrc}
-        title="OAuth Login"
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          border: "none",
-          zIndex: 9999,
-          background: "white",
-          visibility: "hidden", // começa escondido
-          pointerEvents: "none",
-        }}
-      />
     </AuthContext.Provider>
   );
 }
