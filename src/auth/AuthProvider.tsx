@@ -138,8 +138,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
     setIframeSrc(url); // Atualiza o src do iframe
-    //localStorage.getItem("auth") ? showIframe(false, "") : showIframe(true, url);
-
+    showIframe(true, url);
     const messageListener = (event: MessageEvent) => {
       if (event.origin !== window.origin) return;
       const { code } = event.data as { code?: string };
