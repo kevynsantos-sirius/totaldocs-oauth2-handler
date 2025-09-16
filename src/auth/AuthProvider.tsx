@@ -180,9 +180,9 @@ useEffect(() => {
 }, [auth, manualLogout, loginCompleted, login]);
 
   // checkLogin: salva rota atual antes de disparar login
-  const checkLogin = useCallback((redirectBack: boolean = false) => {
+  const checkLogin = useCallback( async (redirectBack: boolean = false) => {
     if (redirectBack) localStorage.setItem("lastPath", window.location.pathname);
-    login();
+    await login();
   }, [login]);
 
   return (
