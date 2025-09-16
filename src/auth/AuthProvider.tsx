@@ -1,42 +1,14 @@
-import { useState, useEffect, useCallback, ReactNode, useRef } from "react";
+// src/auth/AuthProvider.tsx
+import { useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
-
-// Função para criar o iframe, se não existir
-function createIframe(iframeSrc: string) {
-  let iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
-
-  // Se o iframe não existir, cria um novo
-  if (!iframe) {
-    iframe = document.createElement("iframe");
-    iframe.id = "oauth2-iframe"; // Define um id único para identificar o iframe
-
-    iframe.title = "OAuth Login";
-    iframe.src = iframeSrc;
-    iframe.style.position = "fixed";
-    iframe.style.top = "0";
-    iframe.style.left = "0";
-    iframe.style.width = "100%";
-    iframe.style.height = "100%";
-    iframe.style.border = "none";
-    iframe.style.zIndex = "9999";
-    iframe.style.background = "white";
-
-    // Adiciona o iframe ao body do documento
-    document.body.appendChild(iframe);
-  } else {
-    // Se o iframe já existir, apenas atualize o src
-    iframe.src = iframeSrc;
-  }
-}
 
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
 const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
 const REFRESH_TIME = Number(import.meta.env.VITE_OAUTH2_REFRESH_TIME);
-const MAIN_APP = import.meta.env.VITE_MAIN_APP as string;
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -60,9 +32,11 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     return null;
   });
 
+  const [showIframe, setShowIframe] = useState(false);
+  const [iframeSrc, setIframeSrc] = useState("");
   const [manualLogout, setManualLogout] = useState(false);
   const [loginCompleted, setLoginCompleted] = useState(false);
-  const [iframeSrc, setIframeSrc] = useState(""); // URL do iframe
+
 
   const authRef = useRef(auth);
   useEffect(() => { authRef.current = auth; }, [auth]);
@@ -72,23 +46,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     else localStorage.removeItem("auth");
   }, [auth]);
 
-  const showIframe = useCallback((visible: boolean, iframeSrc: string) => {
-    const iframe = document.getElementById("oauth2-iframe") as HTMLIFrameElement | null;
-
-    if (!iframe && visible) {
-      createIframe(iframeSrc);  // Criar o iframe se ele não existir
-    } else if (iframe && !visible) {
-      // Remover o iframe quando invisível
-      console.log('Deixando iframe invisível');
-      document.body.removeChild(iframe);
-    } else if (iframe && visible) {
-      // Exibir o iframe, caso já exista
-      iframe.style.visibility = "visible";
-      iframe.style.pointerEvents = "auto";
-      iframe.style.opacity = "1";
-    }
-  }, []); // Não dependa de iframeSrc aqui
-
+  // Callback do OAuth
   const handleCallback = useCallback(async (code: string) => {
     const codeVerifier = localStorage.getItem("pkce_verifier") || "";
     const body = new URLSearchParams({
@@ -107,29 +65,24 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         expiresIn: response.data.expires_in,
         createdAt: Date.now(),
       });
-
+      setShowIframe(false);
       setManualLogout(false);
       setLoginCompleted(true);
-      showIframe(false, ""); // Esconde o iframe após o login
 
-      const lastPathStorage = localStorage.getItem("lastPath");
-      const lastPath = (lastPathStorage && lastPathStorage !== "/") 
-        ? lastPathStorage 
-        : MAIN_APP;
-
+      // Redireciona para a rota salva
+      const lastPath = localStorage.getItem("lastPath") || "/";
       localStorage.removeItem("lastPath");
       window.history.replaceState({}, document.title, window.location.pathname);
       window.location.replace(lastPath);
 
     } catch (err: any) {
       console.error("Falha no login:", err.response?.data || err.message);
-      showIframe(true, iframeSrc); // Reexibe o iframe em caso de erro
+      setShowIframe(true);
     }
-  }, [showIframe, iframeSrc]); // Aqui ainda mantém `iframeSrc`, mas não é alterado dentro da função
+  }, []);
 
+  // Login
   const login = useCallback(async () => {
-    if (loginCompleted) return;  // Evita chamadas repetidas se já foi concluído
-
     const { codeVerifier, codeChallenge } = await generatePKCE();
     localStorage.setItem("pkce_verifier", codeVerifier);
 
@@ -137,8 +90,9 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       REDIRECT_URI
     )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
-    setIframeSrc(url); // Atualiza o src do iframe
-    showIframe(true, url);
+    setIframeSrc(url);
+    setShowIframe(true);
+
     const messageListener = (event: MessageEvent) => {
       if (event.origin !== window.origin) return;
       const { code } = event.data as { code?: string };
@@ -146,31 +100,63 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     };
 
     window.addEventListener("message", messageListener, { once: true });
-  }, [handleCallback, showIframe, loginCompleted]); // Evitar loop de re-execução
+  }, [handleCallback]);
 
   const logout = useCallback(() => {
     localStorage.removeItem("auth");
     localStorage.removeItem("pkce_verifier");
     setAuth(null);
+    setShowIframe(false);
     setManualLogout(true);
-    showIframe(false, ""); // Remove o iframe após logout
-  }, [showIframe]);
+  }, []);
 
+  // Intervalo para monitorar token
   useEffect(() => {
-    const storedAuth = localStorage.getItem("auth");
-    if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
-      login();
-    }
-  }, [auth, manualLogout, loginCompleted, login]);
+    const interval = setInterval(() => {
+      const currentAuth = authRef.current;
+      if (!currentAuth?.expiresIn) {
+        setShowIframe(true);
+        return;
+      }
+      const ageInSeconds = Math.floor((Date.now() - currentAuth.createdAt) / 1000);
+      if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) login();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [login]);
 
+  // Login automático somente se não houver auth e não tiver logout manual
+useEffect(() => {
+  const storedAuth = localStorage.getItem("auth");
+  if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
+    login();
+  }
+}, [auth, manualLogout, loginCompleted, login]);
+
+  // checkLogin: salva rota atual antes de disparar login
   const checkLogin = useCallback((redirectBack: boolean = false) => {
     if (redirectBack) localStorage.setItem("lastPath", window.location.pathname);
     login();
   }, [login]);
 
   return (
-    <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin, showIframe }}>
+    <AuthContext.Provider value={{ auth, login, logout, handleCallback, checkLogin }}>
       {children}
+      {showIframe && (
+        <iframe
+          src={iframeSrc}
+          title="OAuth Login"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            border: "none",
+            zIndex: 9999,
+            background: "white",
+          }}
+        />
+      )}
     </AuthContext.Provider>
   );
 }

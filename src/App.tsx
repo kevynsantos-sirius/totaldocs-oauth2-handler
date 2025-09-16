@@ -8,7 +8,8 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<Callback />} />
+          <Route path="*" element={null} /> {/* rota default vazia */}
+          <Route path="/callback" element={<Callback />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

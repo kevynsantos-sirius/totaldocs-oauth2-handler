@@ -19,7 +19,7 @@ export default function Callback() {
       });
     } else {
       console.error("Callback sem código OAuth2!");
-      window.location.href = "/errorAuth";
+      window.location.replace("/");
     }
   }, [handleCallback]);
 
