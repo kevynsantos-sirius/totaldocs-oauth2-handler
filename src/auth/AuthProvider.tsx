@@ -3,15 +3,14 @@ import { useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
 import { generatePKCE } from "../utils/pkce";
+import { getTokenExpiration } from "../utils/jwtUtils"; // Importando a função para pegar a expiração do token
 
 // Função para criar o iframe se ele ainda não existir
 function buildIframe() {
-  // Verifica se o iframe já existe
   const src = localStorage.getItem("urlIframe") || "";
   let iframe = document.getElementById("iframe-oauth2") as HTMLIFrameElement;
 
   if (!iframe) {
-    // Cria o iframe apenas se não existir
     iframe = document.createElement("iframe");
     iframe.id = "iframe-oauth2";
     iframe.src = src;
@@ -24,12 +23,8 @@ function buildIframe() {
     iframe.style.border = "none";
     iframe.style.zIndex = "9999";
     iframe.style.background = "white";
-
-    // Adiciona o iframe ao corpo da página
     document.body.appendChild(iframe);
-  }
-  else {
-    // Se o iframe já existe, chama showIframe com o src
+  } else {
     showIframe();
   }
 }
@@ -47,8 +42,8 @@ function showIframe() {
   const src = localStorage.getItem("urlIframe") || "";
   const iframe = document.getElementById("iframe-oauth2") as HTMLIFrameElement;
   if (iframe) {
-    iframe.style.display = "block"; // Torna o iframe visível
-    iframe.src = src; // Atualiza o src do iframe
+    iframe.style.display = "block";
+    iframe.src = src;
   }
 }
 
@@ -113,12 +108,10 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       setManualLogout(false);
       setLoginCompleted(true);
 
-      // Redireciona para a rota salva
       const lastPath = localStorage.getItem("lastPath") || "/";
       localStorage.removeItem("lastPath");
       window.history.replaceState({}, document.title, window.location.pathname);
       window.location.replace(lastPath);
-
     } catch (err: any) {
       console.error("Falha no login:", err.response?.data || err.message);
       buildIframe();
@@ -134,7 +127,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       REDIRECT_URI
     )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
-    localStorage.setItem("urlIframe",url);
+    localStorage.setItem("urlIframe", url);
     buildIframe();
 
     const messageListener = (event: MessageEvent) => {
@@ -157,15 +150,20 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   // Intervalo para monitorar token
   useEffect(() => {
     const interval = setInterval(() => {
-      const currentAuth = authRef.current;
-      if (!currentAuth?.expiresIn) {
-        buildIframe();
+      const accessToken = localStorage.getItem("auth");
+      if (!accessToken) {
+        setAuth(null);
+        localStorage.removeItem("pkce_verifier");
+        window.location.replace("/");  // Redireciona para a rota "/"
         return;
       }
-      const ageInSeconds = Math.floor((Date.now() - currentAuth.createdAt) / 1000);
-      if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) {
-        // Caso o token expire, limpa o localStorage e redireciona para "/"
+
+      const tokenExpiration = getTokenExpiration(accessToken); // Obtém o valor do exp
+
+      if (tokenExpiration && Date.now() >= tokenExpiration * 1000) {
+        // Caso o token tenha expirado, limpa o localStorage e redireciona para "/"
         localStorage.removeItem("auth");
+        localStorage.removeItem("pkce_verifier");
         setAuth(null);
         window.location.replace("/");  // Redireciona para a rota "/"
       }
@@ -173,7 +171,6 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     return () => clearInterval(interval);
   }, [login]);
 
-  // Login automático somente se não houver auth e não tiver logout manual
   useEffect(() => {
     const storedAuth = localStorage.getItem("auth");
     if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
@@ -181,8 +178,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [auth, manualLogout, loginCompleted, login]);
 
-  // checkLogin: salva rota atual antes de disparar login
-  const checkLogin = useCallback( async (redirectBack: boolean = false) => {
+  const checkLogin = useCallback(async (redirectBack: boolean = false) => {
     if (redirectBack) localStorage.setItem("lastPath", window.location.pathname);
     await login();
   }, [login]);
