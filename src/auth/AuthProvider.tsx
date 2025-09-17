@@ -37,6 +37,10 @@ function hideIframe() {
   }
 }
 
+function removeIframe() {
+  document.getElementById("iframe-oauth2")?.remove();
+}
+
 // Função para mostrar o iframe e atualizar o src
 function showIframe() {
   const src = localStorage.getItem("urlIframe") || "";
@@ -154,6 +158,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       if (!accessToken) {
         setAuth(null);
         localStorage.removeItem("pkce_verifier");
+        removeIframe();
         window.location.replace("/");  // Redireciona para a rota "/"
         return;
       }
@@ -165,6 +170,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         localStorage.removeItem("auth");
         localStorage.removeItem("pkce_verifier");
         setAuth(null);
+        removeIframe();
         window.location.replace("/");  // Redireciona para a rota "/"
       }
     }, 30000);
