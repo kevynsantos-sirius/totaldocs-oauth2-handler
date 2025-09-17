@@ -16,8 +16,8 @@ export default function RootRedirect({ pageComponent, main }: RootRedirectProps)
       setLoading(true); // Marca que estamos aguardando o login
       const doRedirect = async () => {
         await checkLogin(true); // Dispara o login
-        setLoading(false); // Após o login, libera o loading
-        setHasAuth(!!localStorage.getItem("auth")); // Atualiza o estado de autenticação
+        setHasAuth(!!localStorage.getItem("auth")); // Atualiza o estado de autenticação após a verificação
+        setLoading(false); // Finaliza o loading
       };
       doRedirect();
     }
