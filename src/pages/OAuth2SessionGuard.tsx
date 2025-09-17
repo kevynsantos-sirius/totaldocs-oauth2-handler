@@ -21,7 +21,6 @@ const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
 const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRender }) => {
   const [auth, setAuth] = useState<Auth | null>(null); // Estado de autenticação
   const [isTokenExpired, setTokenExpired] = useState<boolean>(false); // Estado de expiração do token
-  const [codeChallengeSave, setCodeChallengeSave] = useState<string>(''); // Armazenar o code_verifier
   // Função para verificar se o token está expirado
   const checkTokenExpiration = () => {
     const storedAuth = localStorage.getItem('auth');
@@ -60,7 +59,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     const generateCodeVerifier = async () => {
       const { codeVerifier, codeChallenge } = await generatePKCE();
       localStorage.setItem("codeVerifier",codeVerifier);
-      setCodeChallengeSave(codeChallenge);
+      localStorage.setItem("codeChallenge",codeChallenge);
     };
 
     if (!auth || isTokenExpired) {
@@ -90,7 +89,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
 if (!auth || isTokenExpired) {
   return (
     <iframe
-      src={`${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=user&code_challenge=${encodeURIComponent(codeChallengeSave)}&code_challenge_method=S256`}
+      src={`${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=user&code_challenge=${encodeURIComponent(localStorage.getItem("codeChallenge") || "")}&code_challenge_method=S256`}
       title="OAuth2 Login"
       style={{
         width: '100vw',  // Largura 100% da tela
