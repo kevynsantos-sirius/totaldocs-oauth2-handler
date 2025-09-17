@@ -36,6 +36,12 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
         setTokenExpired(false);
       }
     }
+    const sessionExpired = localStorage.getItem("sessionExpired");
+    if(sessionExpired)
+    {
+      setTokenExpired(true);
+      localStorage.removeItem('auth'); // Remove token expirado
+    }
   };
 
   useEffect(() => {

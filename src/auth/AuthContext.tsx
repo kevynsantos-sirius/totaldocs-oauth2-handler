@@ -70,18 +70,20 @@ const handleCallback = useCallback(async (code: string) => {
 
     // Verifica se é o primeiro login
     const firstLogin = localStorage.getItem('firstLogin');
-    const sessionExpired = localStorage.getItem('sessionExpired');
 
-    if (firstLogin === 'false' && sessionExpired !== 'true') {
+    if (firstLogin === 'true') {
+      // Se for o primeiro login, redireciona para a página inicial
+      window.location.href = '/';
+    } else {
       const lastPath = localStorage.getItem('lastPath');
       if (lastPath) {
         // Redireciona para o lastPath após autenticação
-        window.location.href = lastPath; 
+        window.location.href = lastPath;
       }
-    } else {
-      // Define que não é mais o primeiro login
-      localStorage.setItem('firstLogin', 'false');
     }
+
+    // Define que não é mais o primeiro login
+    localStorage.setItem('firstLogin', 'false');
 
     // Remove 'sessionExpired' após o login bem-sucedido
     localStorage.removeItem('sessionExpired');
