@@ -96,3 +96,5 @@ const handleCallback = useCallback(async (code: string) => {
     </AuthContext.Provider>
   );
 };
+
+export default AuthProvider;  // Certifique-se de exportar como default
