@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext'; // Certifique-se de importar corretamente o useAuth
+import { NavigateFunction } from 'react-router-dom'; // Importando o tipo correto para o navigate
 
 interface CallbackProps {
-  navigate: (path: string) => void; // Define o tipo para o navigate
+  navigate: NavigateFunction; // Usando o tipo correto para o navigate
 }
 
 const Callback: React.FC<CallbackProps> = ({ navigate }) => {
