@@ -1,4 +1,3 @@
-// src/auth/AuthProvider.tsx
 import { useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import AuthContext from "./AuthContext";
 import apiClient from "../api/apiClient";
@@ -80,6 +79,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   });
   const [manualLogout, setManualLogout] = useState(false);
   const [loginCompleted, setLoginCompleted] = useState(false);
+  const [isLoginInProgress, setIsLoginInProgress] = useState<boolean>(false); // Controle do login em progresso
 
   const authRef = useRef(auth);
   useEffect(() => { authRef.current = auth; }, [auth]);
@@ -124,6 +124,10 @@ export default function AuthProvider({ children }: AuthProviderProps) {
 
   // Login
   const login = useCallback(async () => {
+    // Se o login já estiver em progresso, não faz nada
+    if (isLoginInProgress) return;
+    
+    setIsLoginInProgress(true); // Marca o login como em progresso
     const { codeVerifier, codeChallenge } = await generatePKCE();
     localStorage.setItem("pkce_verifier", codeVerifier);
 
@@ -141,7 +145,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     };
 
     window.addEventListener("message", messageListener, { once: true });
-  }, [handleCallback]);
+  }, [handleCallback, isLoginInProgress]);
 
   const logout = useCallback(() => {
     localStorage.removeItem("auth");

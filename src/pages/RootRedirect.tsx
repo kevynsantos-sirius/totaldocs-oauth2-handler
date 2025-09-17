@@ -8,29 +8,31 @@ interface RootRedirectProps {
 
 export default function RootRedirect({ pageComponent, main }: RootRedirectProps) {
   const { checkLogin } = useAuth();
+  const [hasAuth, setHasAuth] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false); // Para controlar o estado de loading
-  const [hasAuth, setHasAuth] = useState<boolean>(false); // Inicializando como false
+  const [isLoginInProgress, setIsLoginInProgress] = useState<boolean>(false); // Novo estado para controle de login
 
   useEffect(() => {
     const storedAuth = localStorage.getItem("auth");
     if (storedAuth) {
       setHasAuth(true); // Se já tiver auth, não precisa verificar
+      return;
     }
-    else
-    {
-       // Caso não tenha auth, disparar o login
-      if (!loading) {
-        setLoading(true); // Marca que estamos aguardando o login
-        const doRedirect = async () => {
-          await checkLogin(true); // Dispara o login
-          const storedAuthAfterCheck = localStorage.getItem("auth");
-          setHasAuth(!!storedAuthAfterCheck); // Atualiza o estado de autenticação após a verificação
-          setLoading(false); // Finaliza o loading
-        };
-        doRedirect();
-      }
+
+    // Evita iniciar o login novamente se já estiver em progresso
+    if (!loading && !isLoginInProgress) {
+      setIsLoginInProgress(true); // Marca o login como em progresso
+      setLoading(true); // Marca que estamos aguardando o login
+      const doRedirect = async () => {
+        await checkLogin(true); // Dispara o login
+        const storedAuthAfterCheck = localStorage.getItem("auth");
+        setHasAuth(!!storedAuthAfterCheck); // Atualiza o estado de autenticação após a verificação
+        setLoading(false); // Finaliza o loading
+        setIsLoginInProgress(false); // Marca o login como finalizado
+      };
+      doRedirect();
     }
-  }, [loading, checkLogin]);
+  }, [loading, isLoginInProgress, checkLogin]);
 
   // Se ainda estiver carregando, exibe o iframe (ou qualquer outro elemento de loading)
   if (loading) {
