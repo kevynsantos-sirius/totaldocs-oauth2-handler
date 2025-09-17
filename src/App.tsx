@@ -9,7 +9,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="*" element={null} /> {/* rota default vazia */}
-          <Route path="/callback" element={<Callback />} />
+          <Route path="/callback" element={<Callback pageComponent={<></>} main="*" />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
