@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import authInterceptor from "./authInterceptor"; // Importa a função do interceptor
 
 // Criação da instância do Axios
 const apiClient: AxiosInstance = axios.create({
@@ -9,21 +10,7 @@ const apiClient: AxiosInstance = axios.create({
   timeout: 10000, // Tempo limite para a requisição (em milissegundos)
 });
 
-// Interceptor de resposta para verificar o status 401
-apiClient.interceptors.response.use(
-  (response) => response, // Se a resposta for bem-sucedida, apenas retorna a resposta
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      // Se o status for 401 (não autorizado), armazena o atributo 'sessionExpired' no localStorage
-      localStorage.setItem("sessionExpired", "true");
-
-      // Redireciona para a página inicial
-      window.location.href = "/";
-    }
-
-    // Retorna a promessa rejeitada para que o código que chamou a requisição possa lidar com o erro
-    return Promise.reject(error);
-  }
-);
+// Aplica o interceptor de autenticação
+authInterceptor(apiClient);
 
 export default apiClient;
