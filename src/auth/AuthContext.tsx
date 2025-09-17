@@ -68,25 +68,6 @@ const handleCallback = useCallback(async (code: string) => {
     setAuth(newAuth); // Atualiza o estado de autenticação
     localStorage.setItem('auth', JSON.stringify(newAuth)); // Salva no localStorage
 
-    // Verifica se é o primeiro login
-    const firstLogin = localStorage.getItem('firstLogin');
-
-    if (firstLogin === 'true') {
-      // Se for o primeiro login, redireciona para a página inicial
-      window.location.href = '/';
-    } else {
-      const lastPath = localStorage.getItem('lastPath');
-      if (lastPath) {
-        // Redireciona para o lastPath após autenticação
-        window.location.href = lastPath;
-      }
-    }
-
-    // Define que não é mais o primeiro login
-    localStorage.setItem('firstLogin', 'false');
-
-    // Remove 'sessionExpired' após o login bem-sucedido
-    localStorage.removeItem('sessionExpired');
   } catch (error) {
     console.error('Erro ao trocar o código por token:', error);
   }
