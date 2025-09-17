@@ -52,8 +52,6 @@ function showIframe() {
   }
 }
 
-
-
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
@@ -83,7 +81,6 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   });
   const [manualLogout, setManualLogout] = useState(false);
   const [loginCompleted, setLoginCompleted] = useState(false);
-
 
   const authRef = useRef(auth);
   useEffect(() => { authRef.current = auth; }, [auth]);
@@ -166,18 +163,23 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
       const ageInSeconds = Math.floor((Date.now() - currentAuth.createdAt) / 1000);
-      if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) login();
+      if (currentAuth.expiresIn - ageInSeconds <= REFRESH_TIME) {
+        // Caso o token expire, limpa o localStorage e redireciona para "/"
+        localStorage.removeItem("auth");
+        setAuth(null);
+        window.location.replace("/");  // Redireciona para a rota "/"
+      }
     }, 30000);
     return () => clearInterval(interval);
   }, [login]);
 
   // Login automático somente se não houver auth e não tiver logout manual
-useEffect(() => {
-  const storedAuth = localStorage.getItem("auth");
-  if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
-    login();
-  }
-}, [auth, manualLogout, loginCompleted, login]);
+  useEffect(() => {
+    const storedAuth = localStorage.getItem("auth");
+    if (!auth && !manualLogout && !storedAuth && !loginCompleted) {
+      login();
+    }
+  }, [auth, manualLogout, loginCompleted, login]);
 
   // checkLogin: salva rota atual antes de disparar login
   const checkLogin = useCallback( async (redirectBack: boolean = false) => {
