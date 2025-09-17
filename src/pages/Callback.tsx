@@ -1,7 +1,12 @@
 import useAuth from "../auth/useAuth";
-import { useEffect, useState } from "react";
+import { useEffect, useState, ReactNode } from "react";
 
-export default function Callback() {
+interface CallbackProps {
+  pageComponent: ReactNode; // Componente a ser renderizado após o login bem-sucedido
+  main: string; // Rota principal para redirecionamento após o login
+}
+
+export default function Callback({ pageComponent, main }: CallbackProps) {
   const { handleCallback } = useAuth();
   const [loading, setLoading] = useState<boolean>(true); // Estado de loading para controle
 
@@ -11,7 +16,7 @@ export default function Callback() {
     if (storedAuth) {
       // Já autenticado, redireciona para a página principal
       setLoading(false);
-      const lastPath = localStorage.getItem("lastPath") || "/";
+      const lastPath = localStorage.getItem("lastPath") || main;
       window.location.replace(lastPath); // Redireciona para a última página ou à raiz
       return;
     }
@@ -35,7 +40,7 @@ export default function Callback() {
       setLoading(false);
       window.location.replace("/"); // Redireciona para a página inicial caso não tenha o código
     }
-  }, [handleCallback]);
+  }, [handleCallback, main]);
 
   // Exibe uma tela de loading enquanto o processo de autenticação é feito
   if (loading) {
@@ -47,5 +52,6 @@ export default function Callback() {
     );
   }
 
-  return null; // Não renderiza nada quando o processo for concluído
+  // Se o login for bem-sucedido, renderiza o componente passado
+  return <>{pageComponent}</>;
 }
