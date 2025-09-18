@@ -25,7 +25,8 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
     if (storedAuth) {
       const parsedAuth: Auth = JSON.parse(storedAuth);
       const isExpired = Date.now() - parsedAuth.createdAt > parsedAuth.expiresIn * 1000;
-      if (isExpired) {
+      const tokenExpired = localStorage.getItem("sessionExpired");
+      if (isExpired || tokenExpired) {
         setTokenExpired(true);
         localStorage.removeItem('auth');  // Remove o token expirado
       } else {
