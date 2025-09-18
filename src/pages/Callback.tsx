@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigateFunction } from 'react-router-dom'; // Importando o tipo correto para o navigate
 
 interface CallbackProps {
@@ -17,6 +17,8 @@ interface Auth {
 }
 
 const Callback: React.FC<CallbackProps> = ({ navigate }) => {
+  const [error, setError] = useState<string | null>(null); // Estado para lidar com erros
+
   useEffect(() => {
     const fetchToken = async (code: string) => {
       try {
@@ -48,9 +50,11 @@ const Callback: React.FC<CallbackProps> = ({ navigate }) => {
         };
 
         localStorage.setItem('auth', JSON.stringify(newAuth)); // Salva no localStorage
+        // Não navega até que o processo de autenticação seja bem-sucedido
 
       } catch (error) {
         console.error('Erro ao trocar o código por token:', error);
+        setError('Erro na autenticação. Tente novamente.'); // Define o erro para mostrar ao usuário
       }
     };
 
@@ -73,6 +77,11 @@ const Callback: React.FC<CallbackProps> = ({ navigate }) => {
       }
     }
   }, [navigate]);
+
+  // Se houver erro, exibe a mensagem de erro
+  if (error) {
+    return <div>{error}</div>;
+  }
 
   return <div>Loading...</div>;
 };
