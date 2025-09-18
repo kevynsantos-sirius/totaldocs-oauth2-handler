@@ -68,8 +68,10 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
   };
 
   useEffect(() => {
-    checkTokenExpiration(); // Verifica se o token está expirado
 
+    if(!window.location.href.includes("/callback")) {
+      checkTokenExpiration(); // Verifica se o token está expirado
+    }
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     if (code) {
