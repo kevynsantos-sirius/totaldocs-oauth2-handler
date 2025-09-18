@@ -1,8 +1,11 @@
 export default async function generatePKCE(): Promise<{ codeVerifier: string; codeChallenge: string }> {
-    const codeVerifier = generateRandomString(128);
-    const codeChallenge = await generateCodeChallenge(codeVerifier);
-    localStorage.setItem("codeVerifier", codeVerifier);
-    localStorage.setItem("codeChallenge", codeChallenge);
+  const codeChallenge = generateRandomString(128); // Gerando o codeVerifier
+  const codeVerifier = await generateVerifier(codeChallenge); // Calculando o codeChallenge a partir do codeVerifier
+
+  // Armazenando no localStorage na ordem correta
+  localStorage.setItem("codeVerifier", codeVerifier);
+  localStorage.setItem("codeChallenge", codeChallenge);
+
   return { codeVerifier, codeChallenge };
 }
 
@@ -17,7 +20,7 @@ function generateRandomString(length: number): string {
   return result;
 }
 
-async function generateCodeChallenge(codeVerifier: string): Promise<string> {
+async function generateVerifier(codeVerifier: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(codeVerifier);
   const digest = await window.crypto.subtle.digest("SHA-256", data);
