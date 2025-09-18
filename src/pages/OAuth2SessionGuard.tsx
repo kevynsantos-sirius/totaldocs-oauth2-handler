@@ -18,6 +18,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
   const [auth, setAuth] = useState<Auth | null>(null);
   const [isTokenExpired, setTokenExpired] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false); // Novo estado para verificar autenticação
 
   const checkTokenExpiration = () => {
     const storedAuth = localStorage.getItem('auth');
@@ -30,6 +31,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
       } else {
         setAuth(parsedAuth);
         setTokenExpired(false);
+        setIsAuthenticated(true); // Marca como autenticado
       }
     }
   };
@@ -54,6 +56,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
 
       localStorage.setItem('auth', JSON.stringify(newAuth));
       setAuth(newAuth); // Atualiza o estado com o novo token
+      setIsAuthenticated(true); // Marca como autenticado
     } catch (error) {
       console.error('Erro ao trocar o código por token:', error);
       setError('Erro na autenticação. Tente novamente.');
@@ -97,7 +100,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
   }
 
   // Se o token não estiver válido ou estiver expirado, exibe o iframe para login
-  if (!auth || isTokenExpired) {
+  if (!isAuthenticated || isTokenExpired) {
     return (
       <iframe
         src={`${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=user&code_challenge=${encodeURIComponent(localStorage.getItem("codeChallenge") || "")}&code_challenge_method=S256`}
