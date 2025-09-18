@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
-import { generatePKCE } from '../utils/pkce'; // Assumindo que você tem o PKCE gerado
+import generatePKCE from '../utils/pkce'; // Assumindo que você tem o PKCE gerado
 
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;

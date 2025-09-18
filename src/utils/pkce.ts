@@ -1,4 +1,4 @@
-export async function generatePKCE(): Promise<{ codeVerifier: string; codeChallenge: string }> {
+export default async function generatePKCE(): Promise<{ codeVerifier: string; codeChallenge: string }> {
   const codeVerifier = generateRandomString(128);
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   return { codeVerifier, codeChallenge };
