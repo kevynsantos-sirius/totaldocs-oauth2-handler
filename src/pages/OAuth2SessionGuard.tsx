@@ -1,26 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { generatePKCE } from '../utils/pkce';
-
-// Tipos para o estado de autenticação
-interface Auth {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-  createdAt: number;
-}
-
-interface OAuth2SessionGuardProps {
-  ComponentToRender: React.ComponentType; // O componente a ser renderizado quando o token for válido
-}
+import React, { useState, useEffect } from 'react';
+import { generatePKCE } from '../utils/pkce'; // Assumindo que você tem o PKCE gerado
+import axios from 'axios';
 
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
 const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
 
-const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRender }) => {
-  const [auth, setAuth] = useState<Auth | null>(null); // Estado de autenticação
-  const [isTokenExpired, setTokenExpired] = useState<boolean>(false); // Estado de expiração do token
+interface Auth {
+  accessToken: string;   // Token de acesso gerado após a autenticação
+  refreshToken: string;  // Token de atualização, usado para renovar o accessToken quando expirar
+  expiresIn: number;     // Tempo de expiração do accessToken em segundos
+  createdAt: number;     // Timestamp (em milissegundos) de quando o token foi gerado
+}
+
+
+const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
+  const [auth, setAuth] = useState<Auth | null>(null);
+  const [isTokenExpired, setTokenExpired] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   const checkTokenExpiration = () => {
     const storedAuth = localStorage.getItem('auth');
@@ -29,23 +27,50 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
       const isExpired = Date.now() - parsedAuth.createdAt > parsedAuth.expiresIn * 1000;
       if (isExpired) {
         setTokenExpired(true);
-        localStorage.removeItem('auth'); // Remove token expirado
+        localStorage.removeItem('auth');
       } else {
         setAuth(parsedAuth);
         setTokenExpired(false);
       }
     }
-    const sessionExpired = localStorage.getItem("sessionExpired");
-    if(sessionExpired) {
-      setTokenExpired(true);
-      localStorage.removeItem('auth'); // Remove token expirado
+  };
+
+  const fetchToken = async (code: string) => {
+    try {
+      const response = await axios.post(TOKEN_URL, {
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: REDIRECT_URI,
+        client_id: CLIENT_ID,
+        code_verifier: localStorage.getItem("codeVerifier"),
+      });
+
+      const data = response.data;
+      const newAuth: Auth = {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresIn: data.expires_in,
+        createdAt: Date.now(),
+      };
+
+      localStorage.setItem('auth', JSON.stringify(newAuth));
+      setAuth(newAuth); // Atualiza o estado com o novo token
+    } catch (error) {
+      console.error('Erro ao trocar o código por token:', error);
+      setError('Erro na autenticação. Tente novamente.');
     }
   };
 
   useEffect(() => {
     checkTokenExpiration();
-    const timeout = setInterval(checkTokenExpiration, 30000);
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+      fetchToken(code); // Chama a função para buscar o token
+    }
+
+    const timeout = setInterval(checkTokenExpiration, 30000);
     return () => {
       clearInterval(timeout);
     };
@@ -67,6 +92,11 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     }
   }, [auth, isTokenExpired]);
 
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  // Se o token não estiver válido ou estiver expirado, exibe o iframe para login
   if (!auth || isTokenExpired) {
     return (
       <iframe
@@ -81,6 +111,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     );
   }
 
+  // Renderiza o componente principal se o token estiver válido
   return <ComponentToRender />;
 };
 
