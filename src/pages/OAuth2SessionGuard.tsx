@@ -41,13 +41,14 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
     try {
       const codeVerifier = localStorage.getItem("codeVerifier");
       console.log(codeVerifier);
-      const response = await apiClient.post(TOKEN_URL, {
+      const body = new URLSearchParams({
         grant_type: 'authorization_code',
         code,
         redirect_uri: REDIRECT_URI,
         client_id: CLIENT_ID,
-        code_verifier: codeVerifier,
+        code_verifier: codeVerifier || '',
       });
+      const response = await apiClient.post(TOKEN_URL, body);
 
       const data = response.data;
       const newAuth: Auth = {
