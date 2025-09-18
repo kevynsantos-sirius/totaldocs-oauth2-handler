@@ -124,6 +124,11 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
     );
   }
 
+  if(!localStorage.getItem("auth"))
+  {
+    return <></>;
+  }
+
   // Renderiza o componente principal se o token estiver válido
   return <ComponentToRender />;
 };
