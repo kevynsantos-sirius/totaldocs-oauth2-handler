@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import apiClient from '../api/apiClient';
 import { generatePKCE } from '../utils/pkce'; // Assumindo que você tem o PKCE gerado
-import axios from 'axios';
 
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
@@ -8,12 +8,11 @@ const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
 const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
 
 interface Auth {
-  accessToken: string;   // Token de acesso gerado após a autenticação
-  refreshToken: string;  // Token de atualização, usado para renovar o accessToken quando expirar
-  expiresIn: number;     // Tempo de expiração do accessToken em segundos
-  createdAt: number;     // Timestamp (em milissegundos) de quando o token foi gerado
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  createdAt: number;
 }
-
 
 const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
   const [auth, setAuth] = useState<Auth | null>(null);
@@ -27,7 +26,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
       const isExpired = Date.now() - parsedAuth.createdAt > parsedAuth.expiresIn * 1000;
       if (isExpired) {
         setTokenExpired(true);
-        localStorage.removeItem('auth');
+        localStorage.removeItem('auth');  // Remove o token expirado
       } else {
         setAuth(parsedAuth);
         setTokenExpired(false);
@@ -37,7 +36,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
 
   const fetchToken = async (code: string) => {
     try {
-      const response = await axios.post(TOKEN_URL, {
+      const response = await apiClient.post(TOKEN_URL, {
         grant_type: 'authorization_code',
         code,
         redirect_uri: REDIRECT_URI,
@@ -62,7 +61,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
   };
 
   useEffect(() => {
-    checkTokenExpiration();
+    checkTokenExpiration(); // Verifica se o token está expirado
 
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -70,9 +69,9 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
       fetchToken(code); // Chama a função para buscar o token
     }
 
-    const timeout = setInterval(checkTokenExpiration, 30000);
+    const timeout = setInterval(checkTokenExpiration, 30000);  // Checa a cada 30 segundos
     return () => {
-      clearInterval(timeout);
+      clearInterval(timeout);  // Limpa o intervalo quando o componente desmonta
     };
   }, []);
 
@@ -83,11 +82,12 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
       localStorage.setItem("codeChallenge", codeChallenge);
     };
 
+    // Se não houver autenticação ou o token estiver expirado, gera o codeVerifier
     if (!auth || isTokenExpired) {
       generateCodeVerifier();
-      localStorage.setItem('lastPath', window.location.pathname);
+      localStorage.setItem('lastPath', window.location.pathname);  // Salva o último caminho acessado
       if (!localStorage.getItem('firstLogin')) {
-        localStorage.setItem('firstLogin', 'true');
+        localStorage.setItem('firstLogin', 'true');  // Marca o primeiro login
       }
     }
   }, [auth, isTokenExpired]);
