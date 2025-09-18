@@ -105,8 +105,12 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
     return <div>{error}</div>;
   }
 
-  // Se o token não estiver válido ou estiver expirado, exibe o iframe para login
-  if (!isAuthenticated || isTokenExpired) {
+  // Verifica se o iframe já foi exibido
+  const iframeShown = localStorage.getItem('iframeShown');
+
+  // Se o token não estiver válido ou estiver expirado, e o iframe não foi exibido antes
+  if ((!isAuthenticated || isTokenExpired) && !iframeShown) {
+    localStorage.setItem('iframeShown', 'true');  // Marca que o iframe foi exibido
     return (
       <iframe
         src={`${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=user&code_challenge=${encodeURIComponent(localStorage.getItem("codeChallenge") || "")}&code_challenge_method=S256`}
