@@ -39,7 +39,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
 
   const fetchToken = async (code: string) => {
     try {
-      const codeVerifier = localStorage.getItem("codeVerifier");
+      const codeVerifier = localStorage.getItem("codeChallenge");
       console.log(codeVerifier);
       const body = new URLSearchParams({
         grant_type: 'authorization_code',
