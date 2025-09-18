@@ -20,6 +20,19 @@ const Callback: React.FC<CallbackProps> = ({ navigate }) => {
   const [error, setError] = useState<string | null>(null); // Estado para lidar com erros
 
   useEffect(() => {
+    // Verificar se já há um token no localStorage
+    const authData = localStorage.getItem('auth');
+    if (authData) {
+      const parsedAuth = JSON.parse(authData);
+      const isTokenExpired = Date.now() - parsedAuth.createdAt > parsedAuth.expiresIn * 1000;
+      if (!isTokenExpired) {
+        // Se o token já estiver válido, não precisa redirecionar novamente
+        navigate('/'); // Direciona para a home, caso o token já esteja válido
+        return;
+      }
+    }
+
+    // Função para buscar o token
     const fetchToken = async (code: string) => {
       try {
         const response = await fetch(TOKEN_URL, {
@@ -50,7 +63,9 @@ const Callback: React.FC<CallbackProps> = ({ navigate }) => {
         };
 
         localStorage.setItem('auth', JSON.stringify(newAuth)); // Salva no localStorage
-        // Não navega até que o processo de autenticação seja bem-sucedido
+
+        // Após salvar o token, redireciona
+        navigate('/'); // Redireciona para a home ou outra página após sucesso no login
 
       } catch (error) {
         console.error('Erro ao trocar o código por token:', error);
