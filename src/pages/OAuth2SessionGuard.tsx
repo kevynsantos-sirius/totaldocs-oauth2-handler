@@ -91,7 +91,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
 
     // Se não houver autenticação ou o token estiver expirado, gera o codeVerifier
     if (!auth || isTokenExpired) {
-      generateCodeVerifier();
+      //generateCodeVerifier();
       localStorage.setItem('lastPath', window.location.pathname);  // Salva o último caminho acessado
       if (!localStorage.getItem('firstLogin')) {
         localStorage.setItem('firstLogin', 'true');  // Marca o primeiro login
