@@ -77,10 +77,10 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
       fetchToken(code); // Chama a função para buscar o token
     }
 
-    const timeout = setInterval(checkTokenExpiration, 30000);  // Checa a cada 30 segundos
-    return () => {
-      clearInterval(timeout);  // Limpa o intervalo quando o componente desmonta
-    };
+    //const timeout = setInterval(checkTokenExpiration, 30000);  // Checa a cada 30 segundos
+    //return () => {
+    //  clearInterval(timeout);  // Limpa o intervalo quando o componente desmonta
+    //};
   }, []);
 
   useEffect(() => {
