@@ -39,7 +39,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
 
   const fetchToken = async (code: string) => {
     try {
-      const codeVerifier = localStorage.getItem("codeChallenge");
+      const codeVerifier = localStorage.getItem("codeVerifier");
       console.log(codeVerifier);
       const body = new URLSearchParams({
         grant_type: 'authorization_code',
@@ -86,9 +86,7 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
 
   useEffect(() => {
     const generateCodeVerifier = async () => {
-      const { codeVerifier, codeChallenge } = await generatePKCE();
-      localStorage.setItem("codeVerifier", codeVerifier);
-      localStorage.setItem("codeChallenge", codeChallenge);
+       await generatePKCE();
     };
 
     // Se não houver autenticação ou o token estiver expirado, gera o codeVerifier
