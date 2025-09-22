@@ -17,9 +17,9 @@ interface Auth {
 
 const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
   const [auth, setAuth] = useState<Auth | null>(null);
-  const [isTokenExpired, setTokenExpired] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isTokenExpired, setTokenExpired] = useState(false);
+  const [error, setError] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
 
   const checkTokenExpiration = () => {
@@ -103,9 +103,10 @@ const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
     }
   }, [auth, isTokenExpired]);
 
-  if (error) {
+  if (error.length > 0) {
     return <div>{error}</div>;
   }
+
 
   const iframeShown = localStorage.getItem("iframeShown");
 
