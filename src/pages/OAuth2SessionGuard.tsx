@@ -19,41 +19,41 @@ interface OAuth2SessionGuardProps {
   navigate: (to: string, options?: { replace?: boolean; state?: any }) => void;
 }
 
-
-
 const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRender, navigate }) => {
   const [auth, setAuth] = useState<Auth | null>(null);
   const [isTokenExpired, setTokenExpired] = useState(false);
   const [error, setError] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Verifica token no localStorage
   const checkTokenExpiration = () => {
     const storedAuth = localStorage.getItem("auth");
     if (storedAuth) {
       const parsedAuth: Auth = JSON.parse(storedAuth);
-      const isExpired =
-        Date.now() - parsedAuth.createdAt > parsedAuth.expiresIn * 1000;
+      const isExpired = Date.now() - parsedAuth.createdAt > parsedAuth.expiresIn * 1000;
       const tokenExpired = localStorage.getItem("sessionExpired");
+
       if (isExpired || tokenExpired) {
         setTokenExpired(true);
         localStorage.removeItem("auth");
       } else {
         setAuth(parsedAuth);
-        setTokenExpired(false);
         setIsAuthenticated(true);
+        setTokenExpired(false);
       }
     }
   };
 
+  // Troca o code pelo token
   const fetchToken = async (code: string) => {
     try {
-      const codeVerifier = localStorage.getItem("codeVerifier");
+      const codeVerifier = localStorage.getItem("codeVerifier") || "";
       const body = new URLSearchParams({
         grant_type: "authorization_code",
         code,
         redirect_uri: REDIRECT_URI,
         client_id: CLIENT_ID,
-        code_verifier: codeVerifier || "",
+        code_verifier: codeVerifier,
       });
 
       const response = await apiClient.post(TOKEN_URL, body);
@@ -73,19 +73,21 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
       // Limpa flag do iframe
       localStorage.removeItem("iframeShown");
 
-      // Redireciona para o último caminho salvo ou /
-      const lastPath = localStorage.getItem("lastPath") || "/";
+      // Redireciona para o último caminho salvo
+      const lastPath = localStorage.getItem("lastPath") || "/home";
       navigate(lastPath, { replace: true });
-    } catch (error) {
-      console.error("Erro ao trocar o código por token:", error);
+
+      // Remove code da URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (err) {
+      console.error("Erro ao trocar o código por token:", err);
       setError("Erro na autenticação. Tente novamente.");
     }
   };
 
+  // Detecta code e token
   useEffect(() => {
-    if (!window.location.href.includes("/callback")) {
-      checkTokenExpiration();
-    }
+    checkTokenExpiration();
 
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get("code");
@@ -94,6 +96,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     }
   }, []);
 
+  // Gera PKCE se não autenticado
   useEffect(() => {
     const generateCodeVerifier = async () => {
       await generatePKCE();
@@ -108,35 +111,30 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     }
   }, [auth, isTokenExpired]);
 
-  if (error.length > 0) {
+  if (error) {
     return <div>{error}</div>;
   }
 
-
   const iframeShown = localStorage.getItem("iframeShown");
 
-  return (
-    <>
-      {(!isAuthenticated || isTokenExpired) && !iframeShown ? (
-        <iframe
-          key="oauth-iframe"
-          src={`${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
-            REDIRECT_URI
-          )}&scope=user&code_challenge=${encodeURIComponent(
-            localStorage.getItem("codeChallenge") || ""
-          )}&code_challenge_method=S256`}
-          title="OAuth2 Login"
-          style={{
-            width: "100vw",
-            height: "100vh",
-            border: "none",
-          }}
-        />
-      ) : (
-        <ComponentToRender key="main-app" />
-      )}
-    </>
-  );
+  // Se não autenticado ou token expirado, mostra iframe
+  if ((!isAuthenticated || isTokenExpired) && !iframeShown) {
+    localStorage.setItem("iframeShown", "true"); // evita abrir novamente
+    const codeChallenge = encodeURIComponent(localStorage.getItem("codeChallenge") || "");
+    return (
+      <iframe
+        key="oauth-iframe"
+        src={`${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
+          REDIRECT_URI
+        )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`}
+        title="OAuth2 Login"
+        style={{ width: "100vw", height: "100vh", border: "none" }}
+      />
+    );
+  }
+
+  // Autenticado → renderiza componente principal
+  return <ComponentToRender key="main-app" />;
 };
 
 export default OAuth2SessionGuard;
