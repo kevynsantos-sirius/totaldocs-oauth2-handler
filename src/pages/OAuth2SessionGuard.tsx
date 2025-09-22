@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import apiClient from "../api/apiClient";
 import generatePKCE from "../utils/pkce";
 
@@ -15,12 +14,18 @@ interface Auth {
   createdAt: number;
 }
 
-const OAuth2SessionGuard: React.FC<any> = ({ ComponentToRender }) => {
+interface OAuth2SessionGuardProps {
+  ComponentToRender: React.FC<any>;
+  navigate: (to: string, options?: { replace?: boolean; state?: any }) => void;
+}
+
+
+
+const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRender, navigate }) => {
   const [auth, setAuth] = useState<Auth | null>(null);
   const [isTokenExpired, setTokenExpired] = useState(false);
   const [error, setError] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const navigate = useNavigate();
 
   const checkTokenExpiration = () => {
     const storedAuth = localStorage.getItem("auth");
