@@ -66,19 +66,25 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
         createdAt: Date.now(),
       };
 
+      // Salva token no localStorage
       localStorage.setItem("auth", JSON.stringify(newAuth));
+
+      // Atualiza estados
       setAuth(newAuth);
       setIsAuthenticated(true);
+      setTokenExpired(false);
 
       // Limpa flag do iframe
       localStorage.removeItem("iframeShown");
 
-      // Redireciona para o último caminho salvo
-      const lastPath = localStorage.getItem("lastPath") || "/home";
-      navigate(lastPath, { replace: true });
-
-      // Remove code da URL
+      // Remove o "code" da URL ANTES de navegar
       window.history.replaceState({}, document.title, window.location.pathname);
+
+      // Só redireciona se você realmente estiver no /callback
+      if (window.location.pathname.includes("/callback")) {
+        const lastPath = localStorage.getItem("lastPath") || "/home";
+        navigate(lastPath, { replace: true });
+      }
     } catch (err) {
       console.error("Erro ao trocar o código por token:", err);
       setError("Erro na autenticação. Tente novamente.");
