@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import apiClient from "../api/apiClient";
 import generatePKCE from "../utils/pkce";
 
@@ -19,35 +19,23 @@ interface OAuth2SessionGuardProps {
   navigate: (to: string, options?: { replace?: boolean; state?: any }) => void;
 }
 
+type Status = "idle" | "checking" | "needs_login" | "authenticating" | "authenticated" | "error";
+
 const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRender, navigate }) => {
-  const [auth, setAuth] = useState<Auth | null>(null);
-  const [isTokenExpired, setTokenExpired] = useState(false);
-  const [error, setError] = useState("");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
+  const [iframeShown, setIframeShown] = useState<boolean>(() => !!localStorage.getItem("iframeShown"));
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
-  // Verifica token no localStorage
-  const checkTokenExpiration = () => {
-    const storedAuth = localStorage.getItem("auth");
-    if (storedAuth) {
-      const parsedAuth: Auth = JSON.parse(storedAuth);
-      const isExpired = Date.now() - parsedAuth.createdAt > parsedAuth.expiresIn * 1000;
-      const tokenExpired = localStorage.getItem("sessionExpired");
-
-      if (isExpired || tokenExpired) {
-        setTokenExpired(true);
-        localStorage.removeItem("auth");
-      } else {
-        setAuth(parsedAuth);
-        setIsAuthenticated(true);
-        setTokenExpired(false);
-      }
-    }
-  };
-
-  // Troca o code pelo token
+  // fetchToken declared before useEffect so it's stable
   const fetchToken = async (code: string) => {
+    // prevent parallel processing
+    if (sessionStorage.getItem("oauth2_processing")) return;
+    sessionStorage.setItem("oauth2_processing", code);
+
     try {
-      const codeVerifier = localStorage.getItem("codeVerifier") || "";
+      setStatus("authenticating");
+
+      const codeVerifier = localStorage.getItem("codeVerifier") ?? "";
       const body = new URLSearchParams({
         grant_type: "authorization_code",
         code,
@@ -66,60 +54,182 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
         createdAt: Date.now(),
       };
 
+      // Save token and update status
       localStorage.setItem("auth", JSON.stringify(newAuth));
-      setAuth(newAuth);
-      setIsAuthenticated(true);
+      // mark code as processed so we don't try again
+      sessionStorage.setItem("oauth2_processed_code", code);
 
-      // Limpa flag do iframe
+      // clean up iframe flag and url BEFORE navigating
       localStorage.removeItem("iframeShown");
-
-      // Redireciona para o último caminho salvo
-      const lastPath = localStorage.getItem("lastPath") || "/home";
-      navigate(lastPath, { replace: true });
-
-      // Remove code da URL
+      setIframeShown(false);
+      // remove ?code=... from URL
       window.history.replaceState({}, document.title, window.location.pathname);
-    } catch (err) {
+
+      setStatus("authenticated");
+
+      // Only navigate if we are on /callback (avoid remount loops)
+      if (window.location.pathname.includes("/callback")) {
+        const lastPath = localStorage.getItem("lastPath") || "/home";
+        navigate(lastPath, { replace: true });
+      }
+    } catch (err: any) {
       console.error("Erro ao trocar o código por token:", err);
-      setError("Erro na autenticação. Tente novamente.");
+      setErrorMessage(err?.message ?? "Erro na autenticação");
+      setStatus("error");
+    } finally {
+      sessionStorage.removeItem("oauth2_processing");
     }
   };
 
-  // Detecta code e token
+  // Initial boot: check local token + detect code query param
   useEffect(() => {
-    checkTokenExpiration();
+    let mounted = true;
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get("code");
-    if (code) {
-      fetchToken(code);
-    }
-  }, []);
+    const init = async () => {
+      try {
+        setStatus("checking");
 
-  // Gera PKCE se não autenticado
-  useEffect(() => {
-    const generateCodeVerifier = async () => {
-      await generatePKCE();
+        // check existing token
+        const raw = localStorage.getItem("auth");
+        if (raw) {
+          try {
+            const parsed: Auth = JSON.parse(raw);
+            const expired = Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
+            const sessionExpired = !!localStorage.getItem("sessionExpired");
+            if (!expired && !sessionExpired) {
+              if (mounted) setStatus("authenticated");
+              return;
+            } else {
+              // expired -> remove and fallthrough to login flow
+              localStorage.removeItem("auth");
+            }
+          } catch (e) {
+            // corrupted auth blob -> remove and fallthrough
+            localStorage.removeItem("auth");
+          }
+        }
+
+        // If there's a ?code=... param, handle it (but only once)
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get("code");
+        if (code) {
+          const processed = sessionStorage.getItem("oauth2_processed_code");
+          if (processed === code) {
+            // already processed (maybe a redirect remount) -> clean URL and go to needs_login
+            window.history.replaceState({}, document.title, window.location.pathname);
+            if (mounted) setStatus("needs_login");
+            return;
+          }
+          // process token
+          if (mounted) {
+            // ensure PKCE exists (safe guard)
+            if (!localStorage.getItem("codeVerifier")) {
+              try {
+                await generatePKCE();
+              } catch (e) {
+                console.error("Erro ao gerar PKCE antes de fetchToken:", e);
+                setErrorMessage("Erro interno ao preparar autenticação");
+                setStatus("error");
+                return;
+              }
+            }
+            fetchToken(code);
+          }
+          return;
+        }
+
+        // no token and no code -> we need to show login iframe
+        if (mounted) setStatus("needs_login");
+      } catch (e: any) {
+        console.error("Erro no init do OAuth2SessionGuard:", e);
+        setErrorMessage(e?.message ?? "Erro inesperado");
+        if (mounted) setStatus("error");
+      }
     };
 
-    if (!auth || isTokenExpired) {
-      localStorage.setItem("lastPath", window.location.pathname);
-      if (!localStorage.getItem("firstLogin")) {
-        localStorage.setItem("firstLogin", "true");
-      }
-      generateCodeVerifier();
-    }
-  }, [auth, isTokenExpired]);
+    init();
 
-  if (error) {
-    return <div>{error}</div>;
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
+
+  // When we need login, ensure PKCE exists and persist lastPath/firstLogin
+  useEffect(() => {
+    if (status !== "needs_login") return;
+
+    const prepare = async () => {
+      try {
+        if (!localStorage.getItem("firstLogin")) localStorage.setItem("firstLogin", "true");
+        localStorage.setItem("lastPath", window.location.pathname);
+        if (!localStorage.getItem("codeVerifier")) {
+          await generatePKCE();
+        }
+      } catch (e) {
+        console.error("Erro preparing PKCE:", e);
+        setErrorMessage("Erro interno ao iniciar autenticação");
+        setStatus("error");
+      }
+    };
+    prepare();
+  }, [status]);
+
+  // keep iframeShown state in sync with localStorage, set flag only once
+  useEffect(() => {
+    if (status === "needs_login" && !iframeShown) {
+      localStorage.setItem("iframeShown", "true");
+      setIframeShown(true);
+    }
+  }, [status, iframeShown]);
+
+  // ---------- RENDERING ----------
+  if (status === "error") {
+    return (
+      <div style={{ padding: 24, textAlign: "center" }}>
+        <h2 style={{ color: "crimson" }}>Ocorreu um erro inesperado</h2>
+        <p>{errorMessage || "Tente recarregar a página ou limpar os dados de autenticação."}</p>
+        <div style={{ marginTop: 12 }}>
+          <button
+            onClick={() => {
+              // quick clear and reload
+              localStorage.removeItem("auth");
+              localStorage.removeItem("iframeShown");
+              localStorage.removeItem("codeVerifier");
+              localStorage.removeItem("codeChallenge");
+              sessionStorage.removeItem("oauth2_processed_code");
+              window.location.reload();
+            }}
+            style={{ marginRight: 8 }}
+          >
+            Limpar dados e recarregar
+          </button>
+          <button
+            onClick={() => {
+              // attempt a soft retry: clear iframe flag and go to needs_login
+              localStorage.removeItem("iframeShown");
+              setIframeShown(false);
+              setErrorMessage("");
+              setStatus("needs_login");
+            }}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
   }
 
-  const iframeShown = localStorage.getItem("iframeShown");
+  if (status === "authenticating") {
+    return (
+      <div style={{ padding: 24, textAlign: "center" }}>
+        <p>Processando autenticação...</p>
+      </div>
+    );
+  }
 
-  // Se não autenticado ou token expirado, mostra iframe
-  if ((!isAuthenticated || isTokenExpired) && !iframeShown) {
-    localStorage.setItem("iframeShown", "true"); // evita abrir novamente
+  // If not authenticated, show iframe (if not already shown)
+  if (status === "needs_login") {
     const codeChallenge = encodeURIComponent(localStorage.getItem("codeChallenge") || "");
     return (
       <iframe
@@ -133,8 +243,17 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     );
   }
 
-  // Autenticado → renderiza componente principal
-  return <ComponentToRender key="main-app" />;
+  // Authenticated: render app
+  if (status === "authenticated") {
+    return <ComponentToRender key="main-app" />;
+  }
+
+  // Fallback minimal (status idle/checking)
+  return (
+    <div style={{ padding: 24, textAlign: "center" }}>
+      <p>Verificando sessão...</p>
+    </div>
+  );
 };
 
 export default OAuth2SessionGuard;
