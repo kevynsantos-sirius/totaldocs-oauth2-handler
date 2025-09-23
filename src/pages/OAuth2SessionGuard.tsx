@@ -24,23 +24,29 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
   const [isTokenExpired, setTokenExpired] = useState(false);
   const [error, setError] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [fatalError, setFatalError] = useState(false); // <- flag de erro inesperado
 
   // Verifica token no localStorage
   const checkTokenExpiration = () => {
-    const storedAuth = localStorage.getItem("auth");
-    if (storedAuth) {
-      const parsedAuth: Auth = JSON.parse(storedAuth);
-      const isExpired = Date.now() - parsedAuth.createdAt > parsedAuth.expiresIn * 1000;
-      const tokenExpired = localStorage.getItem("sessionExpired");
+    try {
+      const storedAuth = localStorage.getItem("auth");
+      if (storedAuth) {
+        const parsedAuth: Auth = JSON.parse(storedAuth);
+        const isExpired = Date.now() - parsedAuth.createdAt > parsedAuth.expiresIn * 1000;
+        const tokenExpired = localStorage.getItem("sessionExpired");
 
-      if (isExpired || tokenExpired) {
-        setTokenExpired(true);
-        localStorage.removeItem("auth");
-      } else {
-        setAuth(parsedAuth);
-        setIsAuthenticated(true);
-        setTokenExpired(false);
+        if (isExpired || tokenExpired) {
+          setTokenExpired(true);
+          localStorage.removeItem("auth");
+        } else {
+          setAuth(parsedAuth);
+          setIsAuthenticated(true);
+          setTokenExpired(false);
+        }
       }
+    } catch (e) {
+      console.error("Erro ao verificar expiração:", e);
+      setFatalError(true);
     }
   };
 
@@ -66,21 +72,16 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
         createdAt: Date.now(),
       };
 
-      // Salva token no localStorage
       localStorage.setItem("auth", JSON.stringify(newAuth));
 
-      // Atualiza estados
       setAuth(newAuth);
       setIsAuthenticated(true);
       setTokenExpired(false);
 
-      // Limpa flag do iframe
       localStorage.removeItem("iframeShown");
 
-      // Remove o "code" da URL ANTES de navegar
       window.history.replaceState({}, document.title, window.location.pathname);
 
-      // Só redireciona se você realmente estiver no /callback
       if (window.location.pathname.includes("/callback")) {
         const lastPath = localStorage.getItem("lastPath") || "/home";
         navigate(lastPath, { replace: true });
@@ -88,24 +89,37 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     } catch (err) {
       console.error("Erro ao trocar o código por token:", err);
       setError("Erro na autenticação. Tente novamente.");
+      setFatalError(true); // <- trava loop e mostra fallback
     }
   };
 
   // Detecta code e token
   useEffect(() => {
-    checkTokenExpiration();
+    try {
+      checkTokenExpiration();
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get("code");
-    if (code) {
-      fetchToken(code);
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get("code");
+      if (code) {
+        fetchToken(code);
+      }
+    } catch (e) {
+      console.error("Erro inesperado no useEffect principal:", e);
+      setFatalError(true);
     }
   }, []);
 
   // Gera PKCE se não autenticado
   useEffect(() => {
+    if (fatalError) return; // <- evita loop
+
     const generateCodeVerifier = async () => {
-      await generatePKCE();
+      try {
+        await generatePKCE();
+      } catch (e) {
+        console.error("Erro ao gerar PKCE:", e);
+        setFatalError(true);
+      }
     };
 
     if (!auth || isTokenExpired) {
@@ -115,17 +129,27 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
       }
       generateCodeVerifier();
     }
-  }, [auth, isTokenExpired]);
+  }, [auth, isTokenExpired, fatalError]);
 
+  // Se deu erro inesperado → mostra fallback fixo
+  if (fatalError) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "red" }}>
+        <h2>Ocorreu um erro inesperado</h2>
+        <p>Tente recarregar a página ou contatar o suporte.</p>
+      </div>
+    );
+  }
+
+  // Se erro de autenticação "comum"
   if (error) {
     return <div>{error}</div>;
   }
 
   const iframeShown = localStorage.getItem("iframeShown");
 
-  // Se não autenticado ou token expirado, mostra iframe
   if ((!isAuthenticated || isTokenExpired) && !iframeShown) {
-    localStorage.setItem("iframeShown", "true"); // evita abrir novamente
+    localStorage.setItem("iframeShown", "true");
     const codeChallenge = encodeURIComponent(localStorage.getItem("codeChallenge") || "");
     return (
       <iframe
@@ -139,7 +163,6 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     );
   }
 
-  // Autenticado → renderiza componente principal
   return <ComponentToRender key="main-app" />;
 };
 
