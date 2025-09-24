@@ -19,16 +19,26 @@ interface OAuth2SessionGuardProps {
   navigate: (to: string, options?: { replace?: boolean; state?: any }) => void;
 }
 
-type Status = "idle" | "checking" | "needs_login" | "authenticating" | "authenticated" | "error";
+type Status =
+  | "idle"
+  | "checking"
+  | "needs_login"
+  | "authenticating"
+  | "authenticated"
+  | "error";
 
-const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRender, navigate }) => {
+const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
+  ComponentToRender,
+  navigate,
+}) => {
   const [status, setStatus] = useState<Status>("idle");
-  const [iframeShown, setIframeShown] = useState<boolean>(() => !!localStorage.getItem("iframeShown"));
+  const [iframeShown, setIframeShown] = useState<boolean>(
+    () => !!localStorage.getItem("iframeShown")
+  );
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  // fetchToken declared before useEffect so it's stable
+  // troca código por token
   const fetchToken = async (code: string) => {
-    // prevent parallel processing
     if (sessionStorage.getItem("oauth2_processing")) return;
     sessionStorage.setItem("oauth2_processing", code);
 
@@ -54,20 +64,20 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
         createdAt: Date.now(),
       };
 
-      // Save token and update status
       localStorage.setItem("auth", JSON.stringify(newAuth));
-      // mark code as processed so we don't try again
       sessionStorage.setItem("oauth2_processed_code", code);
 
-      // clean up iframe flag and url BEFORE navigating
+      // limpar iframe e flags antes de navegar
       localStorage.removeItem("iframeShown");
       setIframeShown(false);
-      // remove ?code=... from URL
+
+      // remover ?code=... da URL
       window.history.replaceState({}, document.title, window.location.pathname);
 
+      // marcar como autenticado —> React desmonta o iframe e renderiza o app
       setStatus("authenticated");
 
-      // Only navigate if we are on /callback (avoid remount loops)
+      // redirecionar se estiver em /callback
       if (window.location.pathname.includes("/callback")) {
         const lastPath = localStorage.getItem("lastPath") || "/home";
         navigate(lastPath, { replace: true });
@@ -81,7 +91,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     }
   };
 
-  // Initial boot: check local token + detect code query param
+  // verificação inicial
   useEffect(() => {
     let mounted = true;
 
@@ -89,40 +99,34 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
       try {
         setStatus("checking");
 
-        // check existing token
         const raw = localStorage.getItem("auth");
         if (raw) {
           try {
             const parsed: Auth = JSON.parse(raw);
-            const expired = Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
+            const expired =
+              Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
             const sessionExpired = !!localStorage.getItem("sessionExpired");
             if (!expired && !sessionExpired) {
               if (mounted) setStatus("authenticated");
               return;
             } else {
-              // expired -> remove and fallthrough to login flow
               localStorage.removeItem("auth");
             }
-          } catch (e) {
-            // corrupted auth blob -> remove and fallthrough
+          } catch {
             localStorage.removeItem("auth");
           }
         }
 
-        // If there's a ?code=... param, handle it (but only once)
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get("code");
         if (code) {
           const processed = sessionStorage.getItem("oauth2_processed_code");
           if (processed === code) {
-            // already processed (maybe a redirect remount) -> clean URL and go to needs_login
             window.history.replaceState({}, document.title, window.location.pathname);
             if (mounted) setStatus("needs_login");
             return;
           }
-          // process token
           if (mounted) {
-            // ensure PKCE exists (safe guard)
             if (!localStorage.getItem("codeVerifier")) {
               try {
                 await generatePKCE();
@@ -138,7 +142,6 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
           return;
         }
 
-        // no token and no code -> we need to show login iframe
         if (mounted) setStatus("needs_login");
       } catch (e: any) {
         console.error("Erro no init do OAuth2SessionGuard:", e);
@@ -148,20 +151,20 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     };
 
     init();
-
     return () => {
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once on mount
+  }, []);
 
-  // When we need login, ensure PKCE exists and persist lastPath/firstLogin
+  // prepara PKCE quando status = needs_login
   useEffect(() => {
     if (status !== "needs_login") return;
 
     const prepare = async () => {
       try {
-        if (!localStorage.getItem("firstLogin")) localStorage.setItem("firstLogin", "true");
+        if (!localStorage.getItem("firstLogin"))
+          localStorage.setItem("firstLogin", "true");
         localStorage.setItem("lastPath", window.location.pathname);
         if (!localStorage.getItem("codeVerifier")) {
           await generatePKCE();
@@ -175,7 +178,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     prepare();
   }, [status]);
 
-  // keep iframeShown state in sync with localStorage, set flag only once
+  // manter iframeShown em sync com localStorage
   useEffect(() => {
     if (status === "needs_login" && !iframeShown) {
       localStorage.setItem("iframeShown", "true");
@@ -188,11 +191,13 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
         <h2 style={{ color: "crimson" }}>Ocorreu um erro inesperado</h2>
-        <p>{errorMessage || "Tente recarregar a página ou limpar os dados de autenticação."}</p>
+        <p>
+          {errorMessage ||
+            "Tente recarregar a página ou limpar os dados de autenticação."}
+        </p>
         <div style={{ marginTop: 12 }}>
           <button
             onClick={() => {
-              // quick clear and reload
               localStorage.removeItem("auth");
               localStorage.removeItem("iframeShown");
               localStorage.removeItem("codeVerifier");
@@ -206,7 +211,6 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
           </button>
           <button
             onClick={() => {
-              // attempt a soft retry: clear iframe flag and go to needs_login
               localStorage.removeItem("iframeShown");
               setIframeShown(false);
               setErrorMessage("");
@@ -228,9 +232,11 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     );
   }
 
-  // If not authenticated, show iframe (if not already shown)
-  if (status === "needs_login") {
-    const codeChallenge = encodeURIComponent(localStorage.getItem("codeChallenge") || "");
+  // só renderiza o iframe se status=needs_login e iframeShown=true
+  if (status === "needs_login" && iframeShown) {
+    const codeChallenge = encodeURIComponent(
+      localStorage.getItem("codeChallenge") || ""
+    );
     return (
       <iframe
         key="oauth-iframe"
@@ -243,12 +249,11 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({ ComponentToRend
     );
   }
 
-  // Authenticated: render app
   if (status === "authenticated") {
     return <ComponentToRender key="main-app" />;
   }
 
-  // Fallback minimal (status idle/checking)
+  // fallback
   return (
     <div style={{ padding: 24, textAlign: "center" }}>
       <p>Verificando sessão...</p>
