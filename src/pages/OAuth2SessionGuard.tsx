@@ -32,12 +32,9 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
   navigate,
 }) => {
   const [status, setStatus] = useState<Status>("idle");
-  const [iframeShown, setIframeShown] = useState<boolean>(
-    () => !!localStorage.getItem("iframeShown")
-  );
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  // troca código por token
+  // Troca código por token
   const fetchToken = async (code: string) => {
     if (sessionStorage.getItem("oauth2_processing")) return;
     sessionStorage.setItem("oauth2_processing", code);
@@ -67,17 +64,12 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
       localStorage.setItem("auth", JSON.stringify(newAuth));
       sessionStorage.setItem("oauth2_processed_code", code);
 
-      // limpar iframe e flags antes de navegar
-      localStorage.removeItem("iframeShown");
-      setIframeShown(false);
-
-      // remover ?code=... da URL
+      // Remove ?code=... da URL
       window.history.replaceState({}, document.title, window.location.pathname);
 
-      // marcar como autenticado —> React desmonta o iframe e renderiza o app
       setStatus("authenticated");
 
-      // redirecionar se estiver em /callback
+      // Redireciona se estiver na rota de callback
       if (window.location.pathname.includes("/callback")) {
         const lastPath = localStorage.getItem("lastPath") || "/home";
         navigate(lastPath, { replace: true });
@@ -91,7 +83,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     }
   };
 
-  // verificação inicial
+  // Inicialização
   useEffect(() => {
     let mounted = true;
 
@@ -128,20 +120,14 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
           }
           if (mounted) {
             if (!localStorage.getItem("codeVerifier")) {
-              try {
-                await generatePKCE();
-              } catch (e) {
-                console.error("Erro ao gerar PKCE antes de fetchToken:", e);
-                setErrorMessage("Erro interno ao preparar autenticação");
-                setStatus("error");
-                return;
-              }
+              await generatePKCE();
             }
             fetchToken(code);
           }
           return;
         }
 
+        // Se não há código nem sessão, precisa logar
         if (mounted) setStatus("needs_login");
       } catch (e: any) {
         console.error("Erro no init do OAuth2SessionGuard:", e);
@@ -154,39 +140,40 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // prepara PKCE quando status = needs_login
+  // Redireciona para o login se status = needs_login
   useEffect(() => {
     if (status !== "needs_login") return;
 
-    const prepare = async () => {
+    const redirectToLogin = async () => {
       try {
         if (!localStorage.getItem("firstLogin"))
           localStorage.setItem("firstLogin", "true");
+
         localStorage.setItem("lastPath", window.location.pathname);
+
         if (!localStorage.getItem("codeVerifier")) {
           await generatePKCE();
         }
+
+        const codeChallenge = encodeURIComponent(
+          localStorage.getItem("codeChallenge") || ""
+        );
+        window.location.href = `${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
+          REDIRECT_URI
+        )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
       } catch (e) {
-        console.error("Erro preparing PKCE:", e);
+        console.error("Erro ao preparar redirecionamento OAuth2:", e);
         setErrorMessage("Erro interno ao iniciar autenticação");
         setStatus("error");
       }
     };
-    prepare();
+
+    redirectToLogin();
   }, [status]);
 
-  // manter iframeShown em sync com localStorage
-  useEffect(() => {
-    if (status === "needs_login" && !iframeShown) {
-      localStorage.setItem("iframeShown", "true");
-      setIframeShown(true);
-    }
-  }, [status, iframeShown]);
-
-  // ---------- RENDERING ----------
+  // ---------- RENDER ----------
   if (status === "error") {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
@@ -198,26 +185,13 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
         <div style={{ marginTop: 12 }}>
           <button
             onClick={() => {
-              localStorage.removeItem("auth");
-              localStorage.removeItem("iframeShown");
-              localStorage.removeItem("codeVerifier");
-              localStorage.removeItem("codeChallenge");
-              sessionStorage.removeItem("oauth2_processed_code");
+              localStorage.clear();
+              sessionStorage.clear();
               window.location.reload();
             }}
             style={{ marginRight: 8 }}
           >
             Limpar dados e recarregar
-          </button>
-          <button
-            onClick={() => {
-              localStorage.removeItem("iframeShown");
-              setIframeShown(false);
-              setErrorMessage("");
-              setStatus("needs_login");
-            }}
-          >
-            Tentar novamente
           </button>
         </div>
       </div>
@@ -232,28 +206,10 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     );
   }
 
-  // só renderiza o iframe se status=needs_login e iframeShown=true
-  if (status === "needs_login" && iframeShown) {
-    const codeChallenge = encodeURIComponent(
-      localStorage.getItem("codeChallenge") || ""
-    );
-    return (
-      <iframe
-        key="oauth-iframe"
-        src={`${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
-          REDIRECT_URI
-        )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`}
-        title="OAuth2 Login"
-        style={{ width: "100vw", height: "100vh", border: "none" }}
-      />
-    );
-  }
-
   if (status === "authenticated") {
     return <ComponentToRender key="main-app" />;
   }
 
-  // fallback
   return (
     <div style={{ padding: 24, textAlign: "center" }}>
       <p>Verificando sessão...</p>
