@@ -18,15 +18,9 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) =
   // inicializa storage
   useEffect(() => {
     const init = async () => {
-      if (!localStorage.getItem("firstLogin")) {
-        localStorage.setItem("firstLogin", "true");
-      }
-      if (!localStorage.getItem("lastPath")) {
-        localStorage.setItem("lastPath", window.location.pathname);
-      }
-      if (!localStorage.getItem("codeVerifier")) {
-        await generatePKCE();
-      }
+      if (!localStorage.getItem("firstLogin")) localStorage.setItem("firstLogin", "true");
+      if (!localStorage.getItem("lastPath")) localStorage.setItem("lastPath", window.location.pathname);
+      if (!localStorage.getItem("codeVerifier")) await generatePKCE();
       setIsLoading(false);
     };
     init();
@@ -39,19 +33,13 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) =
       if (!raw) return;
 
       try {
-        const parsed = JSON.parse(raw) as {
-          expiresIn: number;
-          createdAt: number;
-        };
-
+        const parsed = JSON.parse(raw) as { expiresIn: number; createdAt: number };
         const now = Date.now();
         const expMs = parsed.expiresIn * 1000;
         const elapsed = now - parsed.createdAt;
 
         // se faltam menos de 2min → tenta renovar
-        if (expMs - elapsed < 120000) {
-          attemptSilentLogin();
-        }
+        if (expMs - elapsed < 120000) attemptSilentLogin();
       } catch (e) {
         console.error("Erro ao verificar expiração:", e);
       }
@@ -60,51 +48,53 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) =
     return () => clearInterval(interval);
   }, []);
 
-  // tenta fluxo OAuth2 silencioso
+  // fluxo OAuth2 silencioso via iframe
   const attemptSilentLogin = async () => {
     try {
-      // prepara PKCE
-      if (!localStorage.getItem("codeVerifier")) {
-        await generatePKCE();
-      }
+      if (!localStorage.getItem("codeVerifier")) await generatePKCE();
       const codeChallenge = encodeURIComponent(localStorage.getItem("codeChallenge") || "");
 
-      // abre popup invisível para pegar code
-      const popup = window.open(
-        `${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
-          REDIRECT_URI
-        )}&scope=user&prompt=none&code_challenge=${codeChallenge}&code_challenge_method=S256`,
-        "oauth2silent",
-        "width=600,height=600,opacity=0"
-      );
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = `${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
+        REDIRECT_URI
+      )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
-      if (!popup) throw new Error("Não foi possível abrir janela para OAuth2");
+      document.body.appendChild(iframe);
 
-      // aguarda mensagem do popup
-      const listener = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
-        if (event.data.type === "oauth2_code") {
-          window.removeEventListener("message", listener);
-          popup.close();
-          exchangeCodeForToken(event.data.code);
-        } else if (event.data.type === "oauth2_login_required") {
-          window.removeEventListener("message", listener);
-          popup.close();
-          // mostra modal
-          localStorage.setItem("sessionExpired", "true");
-          setSessionExpired(true);
+      const pollIframe = setInterval(async () => {
+        try {
+          const iframeWindow = iframe.contentWindow;
+          if (!iframeWindow) throw new Error("Não foi possível acessar iframe");
+
+          const currentUrl = iframeWindow.location.href;
+
+          // se redirecionou para /callback → extrai code e renova token
+          if (currentUrl.includes("/callback")) {
+            clearInterval(pollIframe);
+            const params = new URL(currentUrl).searchParams;
+            const code = params.get("code");
+            if (code) await exchangeCodeForToken(code);
+            document.body.removeChild(iframe);
+          } 
+          // se redirecionou para outra página (ex: login), sessão expirada
+          else if (!currentUrl.startsWith(AUTH_URL)) {
+            clearInterval(pollIframe);
+            document.body.removeChild(iframe);
+            localStorage.setItem("sessionExpired", "true");
+            setSessionExpired(true);
+          }
+        } catch {
+          // cross-origin ainda não permitido → ignora e continua polling
         }
-      };
-      window.addEventListener("message", listener);
+      }, 500);
     } catch (err) {
       console.error("Erro no fluxo silencioso:", err);
-      // se der erro, mostra modal
       localStorage.setItem("sessionExpired", "true");
       setSessionExpired(true);
     }
   };
 
-  // troca code por token
   const exchangeCodeForToken = async (code: string) => {
     try {
       const codeVerifier = localStorage.getItem("codeVerifier") ?? "";
@@ -125,12 +115,7 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) =
       if (!response.ok) throw new Error("Falha ao trocar código por token");
       const data = await response.json();
 
-      const newAuth = {
-        accessToken: data.access_token,
-        expiresIn: data.expires_in,
-        createdAt: Date.now(),
-      };
-
+      const newAuth = { accessToken: data.access_token, expiresIn: data.expires_in, createdAt: Date.now() };
       localStorage.setItem("auth", JSON.stringify(newAuth));
       localStorage.removeItem("sessionExpired");
       setSessionExpired(false);
@@ -144,7 +129,7 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) =
   const handleModalOk = () => {
     localStorage.clear();
     sessionStorage.clear();
-    navigate("/"); // volta para login
+    navigate("/");
     setSessionExpired(false);
   };
 
