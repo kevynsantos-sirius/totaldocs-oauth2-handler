@@ -31,6 +31,37 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children }) => {
     initializeLocalStorage();
   }, []);
 
+  useEffect(() => {
+    // timer que roda a cada 30s para verificar expiração
+    const interval = setInterval(() => {
+      console.log('Verificando sessão');
+      const raw = localStorage.getItem("auth");
+      if (!raw) return;
+
+      try {
+        const parsed = JSON.parse(raw) as {
+          expiresIn: number;
+          createdAt: number;
+        };
+
+        const expired =
+          Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
+
+        if (expired) {
+          // marca sessão como expirada para o guard redirecionar
+          localStorage.setItem("sessionExpired", "true");
+
+          // opcional: remover o auth ou notificar usuário
+          // localStorage.removeItem("auth");
+        }
+      } catch (e) {
+        console.error("Erro ao verificar expiração:", e);
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   if (isLoading) {
     return <div>Carregando...</div>;
   }
