@@ -199,9 +199,31 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
   }
 
   if (status === "authenticating") {
-    return (
+      return (
       <div style={{ padding: 24, textAlign: "center" }}>
-        <p>Processando autenticação...</p>
+        <div style={{ marginBottom: 16 }}>
+          <div 
+            style={{
+              width: 40,
+              height: 40,
+              border: "4px solid #ccc",
+              borderTop: "4px solid #1976d2",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+              margin: "0 auto",
+            }}
+          />
+        </div>
+        <p style={{ fontSize: 16, fontWeight: "bold" }}>Processando autenticação...</p>
+        <p style={{ fontSize: 14, color: "#555" }}>Isso pode levar alguns segundos</p>
+        <style>
+          {`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}
+        </style>
       </div>
     );
   }
