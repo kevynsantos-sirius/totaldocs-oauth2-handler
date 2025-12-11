@@ -35,8 +35,11 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) =
       try {
         const parsed = JSON.parse(raw) as { expiresIn: number; createdAt: number };
         const now = Date.now();
+        console.log("Agora: "+now);
         const expMs = parsed.expiresIn * 1000;
+        console.log("Expiração: "+expMs);
         const elapsed = now - parsed.createdAt;
+        console.log("Restante de agora menos a data de criação"+elapsed);
 
         // se faltam menos de 2min → tenta renovar
         if (expMs - elapsed < 120000) attemptSilentLogin();
@@ -129,6 +132,7 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) =
   const handleModalOk = () => {
     localStorage.clear();
     sessionStorage.clear();
+    localStorage.setItem("sessionExpired", "true");
     navigate("/");
     setSessionExpired(false);
   };
