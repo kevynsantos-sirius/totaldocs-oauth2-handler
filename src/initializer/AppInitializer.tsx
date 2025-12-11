@@ -39,16 +39,19 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) =
         const exp = getTokenExpiration(parsed.accessToken);
         console.log("Agora: "+now);
         const expMs = parsed.expiresIn * 1000;
-        const expCalc = parsed.createdAt + expMs;
+        const epochSec = Math.floor(expMs / 1000);
+        const expCalc = parsed.createdAt + epochSec;
         console.log("Expiração token: " + exp);
         console.log("Expiração calculada: "+ expCalc);
         const elapsed = now - parsed.createdAt;
         console.log("Tempo desde a data de criação (calc): "+elapsed);
-        console.log("Tempo restante (calc): "+ (expMs - elapsed));
-        console.log("Tempo restante (token - now): "+ (exp - now));
+        console.log("Tempo restante (calc): "+ (epochSec - elapsed));
+        console.log("Tempo restante (token - now): "+ (now - epochSec));
+
+        
 
         // se faltam menos de 2min → tenta renovar
-        if (expMs - elapsed < 120000) attemptSilentLogin();
+        if (epochSec - elapsed < 120000) attemptSilentLogin();
       } catch (e) {
         console.error("Erro ao verificar expiração:", e);
       }
