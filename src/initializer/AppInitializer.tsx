@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import generatePKCE from "../utils/pkce";
+import { getTokenExpiration } from "../utils/jwtUtils";
 
 const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
 const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
@@ -33,13 +34,18 @@ const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) =
       if (!raw) return;
 
       try {
-        const parsed = JSON.parse(raw) as { expiresIn: number; createdAt: number };
+        const parsed = JSON.parse(raw) as { expiresIn: number; createdAt: number; accessToken: string };
         const now = Date.now();
+        const exp = getTokenExpiration(parsed.accessToken);
         console.log("Agora: "+now);
         const expMs = parsed.expiresIn * 1000;
-        console.log("Expiração: "+expMs);
+        const expCalc = parsed.createdAt + expMs;
+        console.log("Expiração token: " + exp);
+        console.log("Expiração calculada: "+ expCalc);
         const elapsed = now - parsed.createdAt;
-        console.log("Restante de agora menos a data de criação"+elapsed);
+        console.log("Tempo desde a data de criação (calc): "+elapsed);
+        console.log("Tempo restante (calc): "+ (expMs - elapsed));
+        console.log("Tempo restante (token - now): "+ (exp - now));
 
         // se faltam menos de 2min → tenta renovar
         if (expMs - elapsed < 120000) attemptSilentLogin();
