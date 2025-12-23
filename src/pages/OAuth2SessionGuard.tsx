@@ -23,6 +23,7 @@ type Status =
   | "idle"
   | "checking"
   | "needs_login"
+  | "logout"
   | "authenticating"
   | "authenticated"
   | "error";
@@ -32,9 +33,9 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
   navigate,
 }) => {
   const [status, setStatus] = useState<Status>("idle");
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // Troca código por token
+  // ================= TOKEN EXCHANGE =================
   const fetchToken = async (code: string) => {
     if (sessionStorage.getItem("oauth2_processing")) return;
     sessionStorage.setItem("oauth2_processing", code);
@@ -51,8 +52,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
         code_verifier: codeVerifier,
       });
 
-      const response = await apiClient.post(TOKEN_URL, body);
-      const data = response.data;
+      const { data } = await apiClient.post(TOKEN_URL, body);
 
       const newAuth: Auth = {
         accessToken: data.access_token,
@@ -62,28 +62,26 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
       };
 
       localStorage.setItem("auth", JSON.stringify(newAuth));
+      localStorage.removeItem("sessionExpired");
       sessionStorage.setItem("oauth2_processed_code", code);
 
-      // Remove ?code=... da URL
       window.history.replaceState({}, document.title, window.location.pathname);
-
       setStatus("authenticated");
 
-      // Redireciona se estiver na rota de callback
       if (window.location.pathname.includes("/callback")) {
         const lastPath = localStorage.getItem("lastPath") || "/home";
         navigate(lastPath, { replace: true });
       }
     } catch (err: any) {
-      console.error("Erro ao trocar o código por token:", err);
-      setErrorMessage(err?.message ?? "Erro na autenticação");
+      console.error("Erro ao trocar o código:", err);
+      setErrorMessage("Falha na autenticação");
       setStatus("error");
     } finally {
       sessionStorage.removeItem("oauth2_processing");
     }
   };
 
-  // Inicialização
+  // ================= INIT =================
   useEffect(() => {
     let mounted = true;
 
@@ -92,46 +90,38 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
         setStatus("checking");
 
         const raw = localStorage.getItem("auth");
-        if (raw) {
-          try {
-            const parsed: Auth = JSON.parse(raw);
-            const expired =
-              Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
-            const sessionExpired = !!localStorage.getItem("sessionExpired");
-            if (!expired && !sessionExpired) {
-              if (mounted) setStatus("authenticated");
-              return;
-            } else {
-              localStorage.removeItem("auth");
-            }
-          } catch {
-            localStorage.removeItem("auth");
-          }
-        }
+        const sessionExpired = !!localStorage.getItem("sessionExpired");
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get("code");
-        if (code) {
-          const processed = sessionStorage.getItem("oauth2_processed_code");
-          if (processed === code) {
-            window.history.replaceState({}, document.title, window.location.pathname);
-            if (mounted) setStatus("needs_login");
+        if (raw && !sessionExpired) {
+          const parsed: Auth = JSON.parse(raw);
+          const expired = Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
+
+          if (!expired) {
+            if (mounted) setStatus("authenticated");
             return;
           }
-          if (mounted) {
+
+          localStorage.removeItem("auth");
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+
+        if (code) {
+          const processed = sessionStorage.getItem("oauth2_processed_code");
+          if (processed !== code) {
             if (!localStorage.getItem("codeVerifier")) {
               await generatePKCE();
             }
             fetchToken(code);
+            return;
           }
-          return;
         }
 
-        // Se não há código nem sessão, precisa logar
         if (mounted) setStatus("needs_login");
-      } catch (e: any) {
-        console.error("Erro no init do OAuth2SessionGuard:", e);
-        setErrorMessage(e?.message ?? "Erro inesperado");
+      } catch (e) {
+        console.error("Erro no init:", e);
+        setErrorMessage("Erro inesperado");
         if (mounted) setStatus("error");
       }
     };
@@ -142,33 +132,25 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     };
   }, []);
 
+  // ================= LOGOUT EVENT =================
   useEffect(() => {
-const handleLogout = () => {
-  localStorage.clear();
-  sessionStorage.clear();
+    const handleLogout = () => {
+      localStorage.clear();
+      sessionStorage.clear();
+      localStorage.setItem("sessionExpired", "true");
+      setStatus("logout");
+    };
 
-  // 🔑 FLAG CRÍTICA
-  localStorage.setItem("sessionExpired", "true");
+    window.addEventListener("oauth2:logout", handleLogout);
+    return () => window.removeEventListener("oauth2:logout", handleLogout);
+  }, []);
 
-  setStatus("needs_login");
-};
-
-  window.addEventListener("oauth2:logout", handleLogout);
-
-  return () => {
-    window.removeEventListener("oauth2:logout", handleLogout);
-  };
-}, [navigate]);
-
-  // Redireciona para o login se status = needs_login
+  // ================= REDIRECT LOGIN =================
   useEffect(() => {
-    if (status !== "needs_login") return;
+    if (status !== "needs_login" && status !== "logout") return;
 
     const redirectToLogin = async () => {
       try {
-        if (!localStorage.getItem("firstLogin"))
-          localStorage.setItem("firstLogin", "true");
-
         localStorage.setItem("lastPath", window.location.pathname);
 
         if (!localStorage.getItem("codeVerifier")) {
@@ -178,12 +160,17 @@ const handleLogout = () => {
         const codeChallenge = encodeURIComponent(
           localStorage.getItem("codeChallenge") || ""
         );
-        window.location.href = `${AUTH_URL}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
-          REDIRECT_URI
-        )}&scope=user&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+
+        window.location.href =
+          `${AUTH_URL}?response_type=code` +
+          `&client_id=${CLIENT_ID}` +
+          `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+          `&scope=user` +
+          `&code_challenge=${codeChallenge}` +
+          `&code_challenge_method=S256`;
       } catch (e) {
-        console.error("Erro ao preparar redirecionamento OAuth2:", e);
-        setErrorMessage("Erro interno ao iniciar autenticação");
+        console.error("Erro no redirect:", e);
+        setErrorMessage("Erro ao iniciar autenticação");
         setStatus("error");
       }
     };
@@ -191,70 +178,34 @@ const handleLogout = () => {
     redirectToLogin();
   }, [status]);
 
-  // ---------- RENDER ----------
+  // ================= RENDER =================
   if (status === "error") {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
-        <h2 style={{ color: "crimson" }}>Ocorreu um erro inesperado</h2>
-        <p>
-          {errorMessage ||
-            "Tente recarregar a página ou limpar os dados de autenticação."}
-        </p>
-        <div style={{ marginTop: 12 }}>
-          <button
-            onClick={() => {
-              localStorage.clear();
-              sessionStorage.clear();
-              window.location.reload();
-            }}
-            style={{ marginRight: 8 }}
-          >
-            Limpar dados e recarregar
-          </button>
-        </div>
+        <h2 style={{ color: "crimson" }}>Erro de autenticação</h2>
+        <p>{errorMessage}</p>
+        <button
+          onClick={() => {
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.reload();
+          }}
+        >
+          Limpar dados e recarregar
+        </button>
       </div>
     );
   }
 
   if (status === "authenticating") {
-      return (
-      <div style={{ padding: 24, textAlign: "center" }}>
-        <div style={{ marginBottom: 16 }}>
-          <div 
-            style={{
-              width: 40,
-              height: 40,
-              border: "4px solid #ccc",
-              borderTop: "4px solid #1976d2",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto",
-            }}
-          />
-        </div>
-        <p style={{ fontSize: 16, fontWeight: "bold" }}>Processando autenticação...</p>
-        <p style={{ fontSize: 14, color: "#555" }}>Isso pode levar alguns segundos</p>
-        <style>
-          {`
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          `}
-        </style>
-      </div>
-    );
+    return <div style={{ padding: 24 }}>Processando autenticação…</div>;
   }
 
   if (status === "authenticated") {
-    return <ComponentToRender key="main-app" />;
+    return <ComponentToRender />;
   }
 
-  return (
-    <div style={{ padding: 24, textAlign: "center" }}>
-      <p>Verificando sessão...</p>
-    </div>
-  );
+  return <div style={{ padding: 24 }}>Verificando sessão…</div>;
 };
 
 export default OAuth2SessionGuard;
