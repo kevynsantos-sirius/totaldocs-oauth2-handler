@@ -142,6 +142,19 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+  const handleLogout = () => {
+    window.location.href = '/';
+    setStatus("needs_login");
+  };
+
+  window.addEventListener("oauth2:logout", handleLogout);
+
+  return () => {
+    window.removeEventListener("oauth2:logout", handleLogout);
+  };
+}, [navigate]);
+
   // Redireciona para o login se status = needs_login
   useEffect(() => {
     if (status !== "needs_login") return;

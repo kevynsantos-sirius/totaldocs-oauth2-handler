@@ -4,3 +4,4 @@ export { default as authInterceptor } from './api/authInterceptor';
 export * from './utils/pkce';
 export { getTokenSession } from './utils/storageSession';
 export { default as AppInitializer } from './initializer/AppInitializer';
+export {default as authLogout} from './auth/authLogout';
