@@ -25,7 +25,8 @@ type Status =
   | "needs_login"
   | "authenticating"
   | "authenticated"
-  | "error";
+  | "error"
+  | "logout";
 
 const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
   ComponentToRender,
@@ -150,7 +151,7 @@ const handleLogout = () => {
   // 🔑 FLAG CRÍTICA
   localStorage.setItem("sessionExpired", "true");
 
-  setStatus("needs_login");
+  setStatus("logout");
 };
 
   window.addEventListener("oauth2:logout", handleLogout);
@@ -162,7 +163,9 @@ const handleLogout = () => {
 
   // Redireciona para o login se status = needs_login
   useEffect(() => {
-    if (status !== "needs_login") return;
+  if (status !== "needs_login" && status !== "logout") {
+    return;
+  } 
 
     const redirectToLogin = async () => {
       try {
