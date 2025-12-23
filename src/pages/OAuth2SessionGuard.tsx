@@ -151,7 +151,7 @@ const handleLogout = () => {
   localStorage.setItem("sessionExpired", "true");
 
   setStatus("needs_login");
-  window.location.href = "/";
+  navigate("/");
 };
 
   window.addEventListener("oauth2:logout", handleLogout);
