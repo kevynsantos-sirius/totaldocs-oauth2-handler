@@ -146,8 +146,8 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
   const handleLogout = () => {
     localStorage.clear();
     sessionStorage.clear();
-    window.location.href = '/';
     setStatus("needs_login");
+    window.location.href = '/';
   };
 
   window.addEventListener("oauth2:logout", handleLogout);
