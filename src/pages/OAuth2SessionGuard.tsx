@@ -72,7 +72,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
         const lastPath = localStorage.getItem("lastPath") || "/home";
         navigate(lastPath, { replace: true });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro ao trocar o código:", err);
       setErrorMessage("Falha na autenticação");
       setStatus("error");
@@ -94,7 +94,8 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
 
         if (raw && !sessionExpired) {
           const parsed: Auth = JSON.parse(raw);
-          const expired = Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
+          const expired =
+            Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
 
           if (!expired) {
             if (mounted) setStatus("authenticated");
@@ -106,6 +107,15 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
 
         const params = new URLSearchParams(window.location.search);
         const code = params.get("code");
+
+        const manualLogout = localStorage.getItem("manualLogout") === "true";
+
+        // 🔥 BLOQUEIA AUTO LOGIN APÓS LOGOUT
+        if (code && manualLogout) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+          if (mounted) setStatus("logout");
+          return;
+        }
 
         if (code) {
           const processed = sessionStorage.getItem("oauth2_processed_code");
@@ -137,7 +147,10 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     const handleLogout = () => {
       localStorage.clear();
       sessionStorage.clear();
+
+      localStorage.setItem("manualLogout", "true");
       localStorage.setItem("sessionExpired", "true");
+
       setStatus("logout");
     };
 
@@ -145,9 +158,9 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     return () => window.removeEventListener("oauth2:logout", handleLogout);
   }, []);
 
-  // ================= REDIRECT LOGIN =================
+  // ================= REDIRECT LOGIN (SÓ needs_login) =================
   useEffect(() => {
-    if (status !== "needs_login" && status !== "logout") return;
+    if (status !== "needs_login") return;
 
     const redirectToLogin = async () => {
       try {
@@ -179,6 +192,22 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
   }, [status]);
 
   // ================= RENDER =================
+  if (status === "logout") {
+    return (
+      <div style={{ padding: 24, textAlign: "center" }}>
+        <h2>Você saiu da conta</h2>
+        <button
+          onClick={() => {
+            localStorage.removeItem("manualLogout");
+            setStatus("needs_login");
+          }}
+        >
+          Entrar novamente
+        </button>
+      </div>
+    );
+  }
+
   if (status === "error") {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
