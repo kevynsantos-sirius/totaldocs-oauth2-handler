@@ -179,6 +179,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
           `&client_id=${CLIENT_ID}` +
           `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
           `&scope=user` +
+          `&prompt=login` + // 🔥 AQUI
           `&code_challenge=${codeChallenge}` +
           `&code_challenge_method=S256`;
       } catch (e) {
