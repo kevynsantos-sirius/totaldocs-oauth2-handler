@@ -19,6 +19,51 @@ interface OAuth2SessionGuardProps {
   navigate: (to: string, options?: { replace?: boolean; state?: any }) => void;
 }
 
+type LoadingScreenProps = {
+  message: string;
+};
+
+const LoadingScreen = ({ message }: LoadingScreenProps) => {
+  return (
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        fontFamily: "Arial",
+        background: "#f9fafb"
+      }}
+    >
+      <div className="spinner"></div>
+
+      <p style={{ marginTop: 20, fontSize: 18, color: "#444" }}>
+        {message}
+      </p>
+
+      <style>
+        {`
+        .spinner {
+          width: 48px;
+          height: 48px;
+          border: 5px solid #e5e7eb;
+          border-top: 5px solid #2563eb;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        `}
+      </style>
+    </div>
+  );
+};
+
 type Status =
   | "idle"
   | "checking"
@@ -228,14 +273,14 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
   }
 
   if (status === "authenticating") {
-    return <div style={{ padding: 24 }}>Processando autenticação…</div>;
+    return <LoadingScreen message="Processando autenticação..." />;
   }
 
   if (status === "authenticated") {
     return <ComponentToRender />;
   }
 
-  return <div style={{ padding: 24 }}>Verificando sessão…</div>;
+  return <LoadingScreen message="Verificando sessão..." />;
 };
 
 export default OAuth2SessionGuard;
