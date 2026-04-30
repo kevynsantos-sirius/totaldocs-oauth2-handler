@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import apiClient from "../api/apiClient";
-import generatePKCE from "../utils/pkce";
-import { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI } from "../config/envHelper";
+import apiClient from "../api/apiClient.js";
+import generatePKCE from "../utils/pkce.js";
+import { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI } from "../config/envHelper.js";
 
 interface Auth {
   accessToken: string;

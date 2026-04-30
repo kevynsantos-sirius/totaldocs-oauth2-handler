@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import generatePKCE from "../utils/pkce";
-import { getTokenExpiration } from "../utils/jwtUtils";
-import { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI } from "../config/envHelper";
+import generatePKCE from "../utils/pkce.js";
+import { getTokenExpiration } from "../utils/jwtUtils.js";
+import { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI } from "../config/envHelper.js";
 
 interface AppInitializerProps {
   children: React.ReactNode;

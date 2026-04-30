@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from "axios";
-import authInterceptor from "./authInterceptor"; // Importa a função do interceptor
+import authInterceptor from "./authInterceptor.js"; // Importa a função do interceptor
 
 // Criação da instância do Axios
 const apiClient: AxiosInstance = axios.create({
