@@ -72,7 +72,7 @@ type Status =
 const OAuth2SessionGuard = ({
   ComponentToRender,
   navigate,
-}: OAuth2SessionGuardProps): React.ReactElement => {
+}: OAuth2SessionGuardProps): React.ReactElement | null => {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
