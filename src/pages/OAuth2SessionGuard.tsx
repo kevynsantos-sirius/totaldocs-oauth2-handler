@@ -11,7 +11,7 @@ interface Auth {
 }
 
 interface OAuth2SessionGuardProps {
-  ComponentToRender: React.FC<any>;
+  ComponentToRender: React.ComponentType<any>;
   navigate: (to: string, options?: { replace?: boolean; state?: any }) => void;
 }
 
@@ -69,10 +69,10 @@ type Status =
   | "authenticated"
   | "error";
 
-const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
+const OAuth2SessionGuard = ({
   ComponentToRender,
   navigate,
-}) => {
+}: OAuth2SessionGuardProps): React.ReactElement => {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
