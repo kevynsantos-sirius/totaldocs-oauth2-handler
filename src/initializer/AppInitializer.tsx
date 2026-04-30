@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from "react";
 import generatePKCE from "../utils/pkce";
 import { getTokenExpiration } from "../utils/jwtUtils";
-
-const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
-const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
-const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
-const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
+import { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI } from "../config/envHelper";
 
 interface AppInitializerProps {
   children: React.ReactNode;

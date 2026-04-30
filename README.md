@@ -31,7 +31,10 @@ export default tseslint.config([
     languageOptions: {
       parserOptions: {
         project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: (typeof import.meta !== 'undefined' && (import.meta as any).env?.dirname) ||
+  process.env.dirname ||
+  ''
+        
       },
       // other options...
     },
@@ -60,7 +63,11 @@ export default tseslint.config([
     languageOptions: {
       parserOptions: {
         project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: (typeof import.meta !== 'undefined' && (import.meta as any).env?.dirname) ||
+  process.env.dirname ||
+  '',
+        
+        
       },
       // other options...
     },

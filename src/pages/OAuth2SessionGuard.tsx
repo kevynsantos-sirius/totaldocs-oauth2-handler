@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import apiClient from "../api/apiClient";
 import generatePKCE from "../utils/pkce";
-
-const AUTH_URL = import.meta.env.VITE_OAUTH2_AUTH_URL as string;
-const TOKEN_URL = import.meta.env.VITE_OAUTH2_TOKEN_URL as string;
-const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID as string;
-const REDIRECT_URI = import.meta.env.VITE_OAUTH2_REDIRECT_URI as string;
+import { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI } from "../config/envHelper";
 
 interface Auth {
   accessToken: string;
@@ -80,7 +76,6 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // ================= TOKEN EXCHANGE =================
   const fetchToken = async (code: string) => {
     if (sessionStorage.getItem("oauth2_processing")) return;
     sessionStorage.setItem("oauth2_processing", code);
@@ -126,7 +121,6 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     }
   };
 
-  // ================= INIT =================
   useEffect(() => {
     let mounted = true;
 
@@ -155,7 +149,6 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
 
         const manualLogout = localStorage.getItem("manualLogout") === "true";
 
-        // 🔥 BLOQUEIA AUTO LOGIN APÓS LOGOUT
         if (code && manualLogout) {
           window.history.replaceState({}, document.title, window.location.pathname);
           if (mounted) setStatus("logout");
@@ -187,7 +180,6 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     };
   }, []);
 
-  // ================= LOGOUT EVENT =================
   useEffect(() => {
     const handleLogout = () => {
       localStorage.clear();
@@ -203,7 +195,6 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     return () => window.removeEventListener("oauth2:logout", handleLogout);
   }, []);
 
-  // ================= REDIRECT LOGIN (SÓ needs_login) =================
   useEffect(() => {
     if (status !== "needs_login") return;
 
@@ -224,7 +215,7 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
           `&client_id=${CLIENT_ID}` +
           `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
           `&scope=user` +
-          `&prompt=login` + // 🔥 AQUI
+          `&prompt=login` +
           `&code_challenge=${codeChallenge}` +
           `&code_challenge_method=S256`;
       } catch (e) {
@@ -237,7 +228,6 @@ const OAuth2SessionGuard: React.FC<OAuth2SessionGuardProps> = ({
     redirectToLogin();
   }, [status]);
 
-  // ================= RENDER =================
   if (status === "logout") {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
