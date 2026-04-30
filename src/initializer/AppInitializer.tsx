@@ -8,7 +8,7 @@ interface AppInitializerProps {
   navigate: (to: string, options?: { replace?: boolean; state?: any }) => void;
 }
 
-const AppInitializer: React.FC<AppInitializerProps> = ({ children, navigate }) => {
+function AppInitializer({ children, navigate }: AppInitializerProps): React.ReactElement {
   const [isLoading, setIsLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
 
