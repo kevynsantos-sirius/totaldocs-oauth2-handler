@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import apiClient from "../api/apiClient.js";
 import generatePKCE from "../utils/pkce.js";
-import { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI } from "../config/envHelper.js";
 
 interface Auth {
   accessToken: string;
@@ -10,9 +9,17 @@ interface Auth {
   createdAt: number;
 }
 
+interface OAuth2Config {
+  AUTH_URL: string;
+  TOKEN_URL: string;
+  CLIENT_ID: string;
+  REDIRECT_URI: string;
+}
+
 interface OAuth2SessionGuardProps<P = any> {
   ComponentToRender: React.ComponentType<P>;
   navigate: (to: string, options?: { replace?: boolean; state?: any }) => void;
+  config: OAuth2Config;
 }
 
 type LoadingScreenProps = {
@@ -72,9 +79,13 @@ type Status =
 const OAuth2SessionGuard = ({
   ComponentToRender,
   navigate,
+  config,
 }: OAuth2SessionGuardProps) => {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+
+  // ✅ CONFIG VINDO DO APP
+  const { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI } = config;
 
   const fetchToken = async (code: string) => {
     if (sessionStorage.getItem("oauth2_processing")) return;
