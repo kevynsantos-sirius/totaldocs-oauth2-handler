@@ -7,6 +7,7 @@ interface OAuth2Config {
   TOKEN_URL: string;
   CLIENT_ID: string;
   REDIRECT_URI: string;
+  BASENAME: string; // ✅ NOVO
 }
 
 interface AppInitializerProps {
@@ -23,6 +24,8 @@ function AppInitializer({
   const [isLoading, setIsLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
 
+  const { BASENAME } = config; // ✅ NOVO
+
   // inicializa storage
   useEffect(() => {
     const init = async () => {
@@ -31,7 +34,10 @@ function AppInitializer({
       }
 
       if (!localStorage.getItem("lastPath")) {
-        localStorage.setItem("lastPath", window.location.pathname);
+        localStorage.setItem(
+          "lastPath",
+          window.location.pathname.replace(BASENAME, "") || "/"
+        ); // ✅ AJUSTE
       }
 
       if (!localStorage.getItem("codeVerifier")) {
@@ -66,14 +72,12 @@ function AppInitializer({
 
         const elapsed = now - parsed.createdAt;
 
-        // debug
         console.log("Agora:", now);
         console.log("Expiração token:", expMillis);
         console.log("Expiração calculada:", expCalc);
         console.log("Tempo restante (calc):", expMs - elapsed);
         console.log("Tempo restante (token):", expMillis - now);
 
-        // se faltam menos de 2min → tenta renovar
         if (expMs - elapsed < 120000) {
           attemptSilentLogin();
         }
@@ -85,7 +89,6 @@ function AppInitializer({
     return () => clearInterval(interval);
   }, []);
 
-  // fluxo OAuth2 silencioso via iframe
   const attemptSilentLogin = async () => {
     try {
       if (!localStorage.getItem("codeVerifier")) {
@@ -116,7 +119,6 @@ function AppInitializer({
 
           const currentUrl = iframeWindow.location.href;
 
-          // sucesso → voltou com code
           if (currentUrl.includes("/callback")) {
             clearInterval(pollIframe);
 
@@ -128,18 +130,14 @@ function AppInitializer({
             }
 
             document.body.removeChild(iframe);
-          }
-          // falhou → redirecionou pra login
-          else if (!currentUrl.startsWith(config.AUTH_URL)) {
+          } else if (!currentUrl.startsWith(config.AUTH_URL)) {
             clearInterval(pollIframe);
             document.body.removeChild(iframe);
 
             localStorage.setItem("sessionExpired", "true");
             setSessionExpired(true);
           }
-        } catch {
-          // cross-origin → ignora e continua
-        }
+        } catch {}
       }, 500);
     } catch (err) {
       console.error("Erro no fluxo silencioso:", err);
@@ -193,7 +191,7 @@ function AppInitializer({
     sessionStorage.clear();
     localStorage.setItem("sessionExpired", "true");
 
-    navigate("/");
+    navigate(`${BASENAME}/`); // ✅ AJUSTE
 
     setSessionExpired(false);
   };

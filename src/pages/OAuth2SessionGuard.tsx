@@ -14,6 +14,7 @@ interface OAuth2Config {
   TOKEN_URL: string;
   CLIENT_ID: string;
   REDIRECT_URI: string;
+  BASENAME?: string; // ✅ ADICIONADO
 }
 
 interface OAuth2SessionGuardProps<P = any> {
@@ -85,7 +86,13 @@ const OAuth2SessionGuard = ({
   const [errorMessage, setErrorMessage] = useState("");
 
   // ✅ CONFIG VINDO DO APP
-  const { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI } = config;
+  const { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI, BASENAME = "" } = config;
+
+  // ✅ helper
+  const stripBasename = (path: string) =>
+    BASENAME && path.startsWith(BASENAME)
+      ? path.slice(BASENAME.length)
+      : path;
 
   const fetchToken = async (code: string) => {
     if (sessionStorage.getItem("oauth2_processing")) return;
@@ -211,7 +218,10 @@ const OAuth2SessionGuard = ({
 
     const redirectToLogin = async () => {
       try {
-        localStorage.setItem("lastPath", window.location.pathname);
+        localStorage.setItem(
+          "lastPath",
+          stripBasename(window.location.pathname) // ✅ ALTERADO
+        );
 
         if (!localStorage.getItem("codeVerifier")) {
           await generatePKCE();
