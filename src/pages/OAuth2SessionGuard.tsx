@@ -41,7 +41,6 @@ const LoadingScreen = ({ message }: LoadingScreenProps) => {
       }}
     >
       <div className="spinner"></div>
-
       <p style={{ marginTop: 20, fontSize: 18, color: "#444" }}>
         {message}
       </p>
@@ -85,21 +84,24 @@ const OAuth2SessionGuard = ({
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // ✅ CONFIG VINDO DO APP
   const { AUTH_URL, TOKEN_URL, CLIENT_ID, REDIRECT_URI, BASENAME = "" } = config;
 
-  // ✅ helper
   const stripBasename = (path: string) =>
-    BASENAME && path.startsWith(BASENAME)
-      ? path.slice(BASENAME.length)
-      : path;
+    BASENAME && path.startsWith(BASENAME) ? path.slice(BASENAME.length) : path;
 
   const fetchToken = async (code: string) => {
-    if (sessionStorage.getItem("oauth2_processing")) return;
+    console.log("[OAuth2SessionGuard] fetchToken iniciado com code:", code);
+
+    if (sessionStorage.getItem("oauth2_processing")) {
+      console.log("[OAuth2SessionGuard] fetchToken já em processamento, abortando");
+      return;
+    }
+
     sessionStorage.setItem("oauth2_processing", code);
 
     try {
       setStatus("authenticating");
+      console.log("[OAuth2SessionGuard] Status setado para authenticating");
 
       const codeVerifier = localStorage.getItem("codeVerifier") ?? "";
       const body = new URLSearchParams({
@@ -110,7 +112,9 @@ const OAuth2SessionGuard = ({
         code_verifier: codeVerifier,
       });
 
+      console.log("[OAuth2SessionGuard] Enviando request para TOKEN_URL", TOKEN_URL);
       const { data } = await apiClient.post(TOKEN_URL, body);
+      console.log("[OAuth2SessionGuard] Resposta do TOKEN_URL:", data);
 
       const newAuth: Auth = {
         accessToken: data.access_token,
@@ -120,54 +124,68 @@ const OAuth2SessionGuard = ({
       };
 
       localStorage.setItem("auth", JSON.stringify(newAuth));
+      console.log("[OAuth2SessionGuard] Token salvo no localStorage:", newAuth);
       localStorage.removeItem("sessionExpired");
       sessionStorage.setItem("oauth2_processed_code", code);
 
       window.history.replaceState({}, document.title, window.location.pathname);
       setStatus("authenticated");
+      console.log("[OAuth2SessionGuard] Status setado para authenticated");
 
       if (window.location.pathname.includes("/callback")) {
         const lastPath = localStorage.getItem("lastPath") || "/home";
+        console.log("[OAuth2SessionGuard] Redirecionando para lastPath:", lastPath);
         navigate(lastPath, { replace: true });
       }
     } catch (err) {
-      console.error("Erro ao trocar o código:", err);
+      console.error("[OAuth2SessionGuard] Erro ao trocar código:", err);
       setErrorMessage("Falha na autenticação");
       setStatus("error");
     } finally {
       sessionStorage.removeItem("oauth2_processing");
+      console.log("[OAuth2SessionGuard] fetchToken finalizado");
     }
   };
 
   useEffect(() => {
+    console.log("[OAuth2SessionGuard] useEffect init executado");
+
     let mounted = true;
 
     const init = async () => {
       try {
         setStatus("checking");
+        console.log("[OAuth2SessionGuard] Status setado para checking");
 
         const raw = localStorage.getItem("auth");
+        console.log("[OAuth2SessionGuard] auth do localStorage:", raw);
+
         const sessionExpired = !!localStorage.getItem("sessionExpired");
 
         if (raw && !sessionExpired) {
           const parsed: Auth = JSON.parse(raw);
-          const expired =
-            Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
+          const expired = Date.now() - parsed.createdAt > parsed.expiresIn * 1000;
+
+          console.log("[OAuth2SessionGuard] Token expirado?", expired);
 
           if (!expired) {
             if (mounted) setStatus("authenticated");
+            console.log("[OAuth2SessionGuard] Token válido, status authenticated");
             return;
           }
 
           localStorage.removeItem("auth");
+          console.log("[OAuth2SessionGuard] Token expirado removido");
         }
 
         const params = new URLSearchParams(window.location.search);
         const code = params.get("code");
+        console.log("[OAuth2SessionGuard] Código recebido na URL:", code);
 
         const manualLogout = localStorage.getItem("manualLogout") === "true";
 
         if (code && manualLogout) {
+          console.log("[OAuth2SessionGuard] Manual logout detectado");
           window.history.replaceState({}, document.title, window.location.pathname);
           if (mounted) setStatus("logout");
           return;
@@ -176,8 +194,10 @@ const OAuth2SessionGuard = ({
         if (code) {
           const processed = sessionStorage.getItem("oauth2_processed_code");
           if (processed !== code) {
+            console.log("[OAuth2SessionGuard] Código novo, iniciando fetchToken");
             if (!localStorage.getItem("codeVerifier")) {
               await generatePKCE();
+              console.log("[OAuth2SessionGuard] PKCE gerado");
             }
             fetchToken(code);
             return;
@@ -185,14 +205,16 @@ const OAuth2SessionGuard = ({
         }
 
         if (mounted) setStatus("needs_login");
+        console.log("[OAuth2SessionGuard] Nenhum código encontrado, status needs_login");
       } catch (e) {
-        console.error("Erro no init:", e);
+        console.error("[OAuth2SessionGuard] Erro no init:", e);
         setErrorMessage("Erro inesperado");
         if (mounted) setStatus("error");
       }
     };
 
     init();
+
     return () => {
       mounted = false;
     };
@@ -200,6 +222,7 @@ const OAuth2SessionGuard = ({
 
   useEffect(() => {
     const handleLogout = () => {
+      console.log("[OAuth2SessionGuard] logout detectado");
       localStorage.clear();
       sessionStorage.clear();
 
@@ -217,14 +240,18 @@ const OAuth2SessionGuard = ({
     if (status !== "needs_login") return;
 
     const redirectToLogin = async () => {
+      console.log("[OAuth2SessionGuard] Redirecionando para login");
+
       try {
         localStorage.setItem(
           "lastPath",
-          stripBasename(window.location.pathname) // ✅ ALTERADO
+          stripBasename(window.location.pathname)
         );
+        console.log("[OAuth2SessionGuard] lastPath salvo:", window.location.pathname);
 
         if (!localStorage.getItem("codeVerifier")) {
           await generatePKCE();
+          console.log("[OAuth2SessionGuard] PKCE gerado antes do redirect");
         }
 
         const codeChallenge = encodeURIComponent(
@@ -240,7 +267,7 @@ const OAuth2SessionGuard = ({
           `&code_challenge=${codeChallenge}` +
           `&code_challenge_method=S256`;
       } catch (e) {
-        console.error("Erro no redirect:", e);
+        console.error("[OAuth2SessionGuard] Erro no redirect:", e);
         setErrorMessage("Erro ao iniciar autenticação");
         setStatus("error");
       }
@@ -250,6 +277,7 @@ const OAuth2SessionGuard = ({
   }, [status]);
 
   if (status === "logout") {
+    console.log("[OAuth2SessionGuard] Status logout");
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
         <h2>Você saiu da conta</h2>
@@ -266,12 +294,14 @@ const OAuth2SessionGuard = ({
   }
 
   if (status === "error") {
+    console.log("[OAuth2SessionGuard] Status error:", errorMessage);
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
         <h2 style={{ color: "crimson" }}>Erro de autenticação</h2>
         <p>{errorMessage}</p>
         <button
           onClick={() => {
+            console.log("[OAuth2SessionGuard] Limpar dados e recarregar");
             localStorage.clear();
             sessionStorage.clear();
             window.location.reload();
@@ -284,13 +314,16 @@ const OAuth2SessionGuard = ({
   }
 
   if (status === "authenticating") {
+    console.log("[OAuth2SessionGuard] Status authenticating");
     return <LoadingScreen message="Processando autenticação..." />;
   }
 
   if (status === "authenticated") {
+    console.log("[OAuth2SessionGuard] Status authenticated, renderizando componente");
     return <ComponentToRender />;
   }
 
+  console.log("[OAuth2SessionGuard] Status default, verificando sessão...");
   return <LoadingScreen message="Verificando sessão..." />;
 };
 
